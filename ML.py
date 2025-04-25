@@ -1,117 +1,124 @@
+#!/usr/bin/env python3
+
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.svm import SVC
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.naive_bayes import GaussianNB
-from sklearn.metrics import accuracy_score, classification_report
-from sklearn.impute import SimpleImputer
-import argparse
-import joblib  # For saving the model
-from joblib import dump, load
+from sklearn.metrics import classification_report, accuracy_score
+import joblib
+import os
+import time
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
-# 📂 Charger le dataset
-df = pd.read_csv("final_dataset.csv")
+class ModelTrainer:
+    def __init__(self):
+        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
+        
+    def train(self, X_train, X_test, y_train, y_test):
+        print("\n🔹 Training Random Forest model...")
+        
+        # Train the model
+        self.model.fit(X_train, y_train)
+        
+        # Make predictions
+        y_pred = self.model.predict(X_test)
+        
+        # Calculate accuracy
+        accuracy = accuracy_score(y_test, y_pred)
+        print(f"🔹 Accuracy: {accuracy:.4f}")
+        
+        # Print classification report
+        print("🔹 Classification Report:")
+        print(classification_report(y_test, y_pred))
+        
+        # Save the model
+        self.save_model()
+        
+    def save_model(self, output_dir="models"):
+        os.makedirs(output_dir, exist_ok=True)
+        model_path = os.path.join(output_dir, "random_forest_model.joblib")
+        joblib.dump(self.model, model_path)
+        print(f"✔️ Model saved to {model_path}")
 
-# 🔎 Vérifier la distribution des classes
-print("📌 Distribution des classes :\n", df["Abnormality class"].value_counts())
-
-# 🎯 Définir X (features) et y (target)
-print("📌 Colonnes disponibles :", df.columns)
-X = df.drop(columns=["Abnormality class", "Experiment"], errors="ignore")
-y = df["Abnormality class"]
-
-# 🎭 Encodage des labels (y)
-label_encoder = LabelEncoder()
-y = label_encoder.fit_transform(y)
-
-# 🔄 Convert non-numeric columns to numeric
-non_numeric_columns = X.select_dtypes(include=['object']).columns
-for col in non_numeric_columns:
-    le = LabelEncoder()
-    X[col] = le.fit_transform(X[col])
-
-# 🚨 Handle missing values
-imputer = SimpleImputer(strategy='mean')
-X = pd.DataFrame(imputer.fit_transform(X), columns=X.columns)
-
-# 🎲 Séparer en train & test (80% train, 20% test) avec stratification
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, stratify=y, random_state=42)
-
-# 🔬 Normalisation des features (important pour SVM et KNN)
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-# ✅ Vérification
-print(f"✔️ Taille du jeu de train : {X_train.shape}")
-print(f"✔️ Taille du jeu de test : {X_test.shape}")
-
-# 📌 Initialisation des modèles
-models = {
-    "Random Forest": RandomForestClassifier(),
-    "Decision Tree": DecisionTreeClassifier(),
-    "SVM": SVC(),
-    "KNN": KNeighborsClassifier(),
-    "Naive Bayes": GaussianNB()
-}
-
-# 🔥 Entraînement et évaluation des modèles
-accuracies = {}
-for name, model in models.items():
-    print(f"\n🔹 Entraînement du modèle {name}...")
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
+class DatasetHandler(FileSystemEventHandler):
+    def __init__(self):
+        self.trainer = ModelTrainer()
+        self.last_modified = 0
+        
+    def process_dataset(self, dataset_path):
+        # Add a small delay to ensure the file is completely written
+        time.sleep(1)
+        
+        try:
+            print(f"📌 Processing dataset: {dataset_path}")
+            # Read the dataset
+            df = pd.read_csv(dataset_path, low_memory=False)
+            
+            # Remove rows with NaN values in the target column
+            df = df.dropna(subset=['Abnormality class'])
+            
+            print("📌 Data shape:", df.shape)
+            print("📌 Class distribution:")
+            print(df['Abnormality class'].value_counts())
+            
+            # Drop non-numeric columns and unnecessary columns
+            drop_columns = ['Unnamed: 0', 'timestamp', 'Microservice', 'Experiment']
+            # Find all columns with '_deployed_at' suffix
+            deployed_columns = [col for col in df.columns if col.endswith('_deployed_at')]
+            drop_columns.extend(deployed_columns)
+            
+            # Prepare features and target
+            X = df.drop(drop_columns + ['Abnormality class'], axis=1)
+            y = df['Abnormality class']
+            
+            # Convert all columns to numeric, replacing non-numeric values with NaN
+            X = X.apply(pd.to_numeric, errors='coerce')
+            
+            # Fill NaN values with 0
+            X = X.fillna(0)
+            
+            print("📌 Features shape after preprocessing:", X.shape)
+            
+            # Split the data
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            print(f"✔️ Training set size: {X_train.shape}")
+            print(f"✔️ Test set size: {X_test.shape}")
+            
+            # Train the model
+            self.trainer.train(X_train, X_test, y_train, y_test)
+        except Exception as e:
+            print(f"❌ Error processing dataset: {str(e)}")
     
-    # 🎯 Stocker l'accuracy
-    accuracies[name] = accuracy_score(y_test, y_pred)
+    def on_modified(self, event):
+        if event.src_path.endswith('.csv'):
+            current_time = time.time()
+            # Prevent multiple processing of the same event
+            if current_time - self.last_modified > 1:
+                print(f"\n🔄 Dataset modified: {event.src_path}")
+                self.process_dataset(event.src_path)
+                self.last_modified = current_time
+
+def main():
+    # Create the handler and observer
+    handler = DatasetHandler()
+    observer = Observer()
+    observer.schedule(handler, path=".", recursive=False)
+    observer.start()
     
-    # 📊 Affichage des résultats
-    print(f"📌 Modèle : {name}")
-    print(f"🔹 Accuracy : {accuracies[name]:.4f}")
-    print(f"🔹 Rapport de classification : \n{classification_report(y_test, y_pred, target_names=label_encoder.classes_)}")
-    print("-" * 50)
+    print("👀 Monitoring for dataset changes...")
+    
+    # Initial processing if dataset exists
+    if os.path.exists('final_dataset.csv'):
+        handler.process_dataset('final_dataset.csv')
+    
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+        print("\n⚡ Stopping model training service...")
+    observer.join()
 
-# 📊 Tracer les résultats
-plt.figure(figsize=(8, 5))
-plt.bar(accuracies.keys(), accuracies.values(), color=['blue', 'orange', 'green', 'red', 'purple'])
-plt.xlabel("Modèles")
-plt.ylabel("Accuracy")
-plt.title("Performance des Modèles de Machine Learning")
-plt.ylim(0, 1)
-plt.xticks(rotation=30)
-plt.show()
-
-
-model = KNeighborsClassifier()
-#model = LogisticRegression(solver='liblinear', multi_class='ovr')
-model.fit(X_train, y_train)
-
-
-# 10. Hacer predicciones con el conjunto de validación
-# Make predictions on the validation set
-predictions = model.predict(X_test)
-predictions = predictions.round().astype(int)
-
-# Save the model
-dump(model, 'model_KNN.joblib') 
-
-'''
-# Load the model later
-loaded_model = load('model_KNN.joblib')
-
-
-sample_features = X_test[10]
-sample_features = np.array(sample_features).reshape(1, -1)
-
-# 3. Make prediction
-prediction = loaded_model.predict(sample_features)
-
-# If your model does probabilities:
-# probabilities = model.predict_proba(sample_features)
-
-print(f"Predicted class: {prediction[0]}")'''
+if __name__ == "__main__":
+    main()
