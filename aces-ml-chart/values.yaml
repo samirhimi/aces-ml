@@ -8,7 +8,7 @@ replicaCount: 1
 image:
   repository: aces-ml
   pullPolicy: Always  # Changed to Always for security updates
-  tag: "1.0.0"       # Changed from latest to specific version
+  tag: "1.0.1"       # Updated to latest secure version
 
 imagePullSecrets: []
 nameOverride: ""
@@ -94,3 +94,23 @@ networkPolicy:
 
 seccompProfile:
   type: RuntimeDefault
+
+# Dataset configuration
+dataset:
+  enabled: true
+  path: /app/final_dataset.csv
+  persistentVolume:
+    enabled: true
+    storageClass: ""
+    size: 1Gi
+    accessModes:
+      - ReadWriteOnce
+
+# Model storage configuration
+modelStorage:
+  persistentVolume:
+    enabled: true
+    storageClass: ""
+    size: 2Gi
+    accessModes:
+      - ReadWriteOnce

@@ -47,6 +47,8 @@ spec:
               type: RuntimeDefault
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python3"]
+          args: ["-u", "/app/ML.py"]
           envFrom:
             - configMapRef:
                 name: {{ include "aces-ml-chart.fullname" . }}-config
@@ -59,16 +61,31 @@ spec:
           volumeMounts:
             - name: model-volume
               mountPath: /app/models
+            - name: dataset-volume
+              mountPath: /app/final_dataset.csv
+              subPath: final_dataset.csv
             - name: tmp-volume
               mountPath: /tmp
               readOnly: false
       volumes:
         - name: model-volume
-          emptyDir: 
+          {{- if .Values.modelStorage.persistentVolume.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "aces-ml-chart.fullname" . }}-model-pvc
+          {{- else }}
+          emptyDir:
             medium: Memory
             sizeLimit: 1Gi
+          {{- end }}
+        - name: dataset-volume
+          {{- if .Values.dataset.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "aces-ml-chart.fullname" . }}-dataset-pvc
+          {{- end }}
         - name: tmp-volume
-          emptyDir: {}
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

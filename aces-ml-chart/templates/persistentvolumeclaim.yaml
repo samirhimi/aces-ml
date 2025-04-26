@@ -1,0 +1,35 @@
+{{- if .Values.modelStorage.persistentVolume.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aces-ml-chart.fullname" . }}-model-pvc
+  labels:
+    {{- include "aces-ml-chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- range .Values.modelStorage.persistentVolume.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  storageClassName: {{ .Values.modelStorage.persistentVolume.storageClass | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.modelStorage.persistentVolume.size }}
+{{- end }}
+---
+{{- if .Values.dataset.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "aces-ml-chart.fullname" . }}-dataset-pvc
+  labels:
+    {{- include "aces-ml-chart.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    {{- range .Values.dataset.persistentVolume.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  storageClassName: {{ .Values.dataset.persistentVolume.storageClass | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.dataset.persistentVolume.size }}
+{{- end }}

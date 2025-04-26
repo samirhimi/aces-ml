@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+print("Starting ML service...")
+print("Importing required libraries...")
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -8,8 +11,8 @@ from sklearn.metrics import classification_report, accuracy_score
 import joblib
 import os
 import time
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+from watchdog.observers.polling import PollingObserver
+from watchdog.events import FileSystemEventHandler, FileModifiedEvent
 
 class ModelTrainer:
     def __init__(self):
@@ -102,7 +105,8 @@ class DatasetHandler(FileSystemEventHandler):
 def main():
     # Create the handler and observer
     handler = DatasetHandler()
-    observer = Observer()
+    observer = PollingObserver(timeout=1.0)  # Poll every second
+    print("🔧 Setting up file watcher with 1-second polling interval...")
     observer.schedule(handler, path=".", recursive=False)
     observer.start()
     
@@ -110,11 +114,16 @@ def main():
     
     # Initial processing if dataset exists
     if os.path.exists('final_dataset.csv'):
+        print("📋 Found existing dataset, processing...")
         handler.process_dataset('final_dataset.csv')
     
     try:
         while True:
             time.sleep(1)
+            # Debug: Check if file has changed
+            if os.path.exists('final_dataset.csv'):
+                mtime = os.path.getmtime('final_dataset.csv')
+                print(f"🔍 Checking dataset... Last modified: {time.ctime(mtime)}")
     except KeyboardInterrupt:
         observer.stop()
         print("\n⚡ Stopping model training service...")
