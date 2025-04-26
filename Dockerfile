@@ -2,8 +2,7 @@ FROM python:3.9-slim
 
 # Add security labels
 LABEL org.opencontainers.image.source="https://github.com/samirhimi/aces-ml"
-LABEL org.opencontainers.image.description="AKS Anomaly Detection ML Service"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
+
 
 # Create non-root user
 RUN groupadd -r mluser && useradd -r -g mluser -s /sbin/nologin mluser
