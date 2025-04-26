@@ -4,10 +4,11 @@
 
 replicaCount: 1
 
+# Update image tag to avoid using latest
 image:
   repository: aces-ml
-  pullPolicy: IfNotPresent
-  tag: "latest"
+  pullPolicy: Always  # Changed to Always for security updates
+  tag: "1.0.0"       # Changed from latest to specific version
 
 imagePullSecrets: []
 nameOverride: ""
@@ -20,9 +21,24 @@ serviceAccount:
 
 podAnnotations: {}
 
-podSecurityContext: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
 
-securityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  seccompProfile:
+    type: RuntimeDefault
 
 service:
   type: ClusterIP
@@ -63,3 +79,18 @@ ingress:
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
+
+# Enable network policy
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: default
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: aces-ml
+
+seccompProfile:
+  type: RuntimeDefault
