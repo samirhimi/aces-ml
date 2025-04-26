@@ -100,4 +100,6 @@ Feel free to contribute to this project by submitting issues or pull requests.
 
 ## License
 
-MIT License
+Apache License 2.0
+
+This project is licensed under the Apache License, Version 2.0. You may obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0
