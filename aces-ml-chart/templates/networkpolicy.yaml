@@ -17,6 +17,7 @@ spec:
     {{- toYaml . | nindent 4 }}
     {{- end }}
   egress:
+    # Allow DNS resolution
     - to:
         - namespaceSelector:
             matchLabels:
@@ -29,7 +30,7 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
-    # Allow outbound internet access for package updates and model downloads
+    # Allow only HTTPS to specific endpoints needed for model updates
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
@@ -37,7 +38,19 @@ spec:
               - 10.0.0.0/8
               - 172.16.0.0/12
               - 192.168.0.0/16
+              - 169.254.0.0/16
+              - 127.0.0.0/8
       ports:
+        - port: 443
+          protocol: TCP
+    # Allow cluster internal communication for metrics and logging
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Release.Namespace }}
+      ports:
+        - port: 80
+          protocol: TCP
         - port: 443
           protocol: TCP
 {{- end }}
