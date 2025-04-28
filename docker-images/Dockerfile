@@ -4,9 +4,6 @@ FROM python:3.9-slim
 LABEL org.opencontainers.image.source="https://github.com/samirhimi/aces-ml"
 
 
-# Create non-root user
-RUN groupadd -r mluser && useradd -r -g mluser -s /sbin/nologin mluser
-
 WORKDIR /app
 
 # Install build essentials and security updates
@@ -27,12 +24,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy the application code and dataset
 COPY . .
 
-# Set proper permissions
-RUN chown -R mluser:mluser /app && \
-    chmod -R 755 /app
 
-# Switch to non-root user
-USER mluser
 
 # Add healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
