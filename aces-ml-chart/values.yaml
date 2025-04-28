@@ -97,7 +97,7 @@ seccompProfile:
 # Dataset configuration
 dataset:
   enabled: true
-  path: /app/final_dataset.csv
+  path: /app/
   persistentVolume:
     enabled: true
     storageClass: null  # Changed from "" to null to use default StorageClass

@@ -62,8 +62,7 @@ spec:
             - name: model-volume
               mountPath: /app/models
             - name: dataset-volume
-              mountPath: /app/final_dataset.csv
-              subPath: final_dataset.csv
+              mountPath: /app
             - name: tmp-volume
               mountPath: /tmp
               readOnly: false
