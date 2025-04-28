@@ -4,11 +4,10 @@
 
 replicaCount: 1
 
-# Update image tag to avoid using latest
 image:
-  repository: aces-ml
-  pullPolicy: Always  # Changed to Always for security updates
-  tag: "1.0.1"       # Updated to latest secure version
+  repository: sami4rhimi/aces-ml
+  pullPolicy: Always
+  tag: "1.0.1"       # Updated to match your Docker Hub image tag
 
 imagePullSecrets: []
 nameOverride: ""
@@ -101,7 +100,7 @@ dataset:
   path: /app/final_dataset.csv
   persistentVolume:
     enabled: true
-    storageClass: ""
+    storageClass: null  # Changed from "" to null to use default StorageClass
     size: 1Gi
     accessModes:
       - ReadWriteOnce
@@ -110,7 +109,7 @@ dataset:
 modelStorage:
   persistentVolume:
     enabled: true
-    storageClass: ""
+    storageClass: null  # Changed from "" to null to use default StorageClass
     size: 2Gi
     accessModes:
       - ReadWriteOnce
