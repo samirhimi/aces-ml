@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aces-ml
+  namespace: aces-ml
+  labels:
+    app: aces-ml
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aces-ml
+  template:
+    metadata:
+      labels:
+        app: aces-ml
+      annotations:
+        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
+    spec:
+      serviceAccountName: aces-ml
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: aces-ml
+          image: sami4rhimi/aces-ml:1.0.2
+          imagePullPolicy: Always
+          command: ["python3"]
+          args: ["-u", "/app/ML.py"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+          volumeMounts:
+            - name: model-volume
+              mountPath: /app/models
+            - name: dataset-volume
+              mountPath: /app/data
+            - name: tmp-volume
+              mountPath: /tmp
+              readOnly: false
+          env:
+            - name: ML_MODEL_PATH
+              value: "/app/models/random_forest_model.joblib"
+            - name: LOG_LEVEL
+              value: "INFO"
+      volumes:
+        - name: model-volume
+          persistentVolumeClaim:
+            claimName: aces-ml-model-pvc
+        - name: dataset-volume
+          persistentVolumeClaim:
+            claimName: aces-ml-dataset-pvc
+        - name: tmp-volume
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
