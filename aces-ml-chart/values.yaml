@@ -13,7 +13,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
-  create: true
+  create: false
   name: ""
 
 podAnnotations: {}
