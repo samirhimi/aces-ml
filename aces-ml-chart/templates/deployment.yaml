@@ -4,96 +4,80 @@ metadata:
   name: {{ include "aces-ml-chart.fullname" . }}
   labels:
     {{- include "aces-ml-chart.labels" . | nindent 4 }}
+    {{- with .Values.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "aces-ml-chart.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      annotations:
-        seccomp.security.alpha.kubernetes.io/pod: 'runtime/default'
-        {{- with .Values.podAnnotations }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
       labels:
         {{- include "aces-ml-chart.selectorLabels" . | nindent 8 }}
-    spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
+        {{- with .Values.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+    spec:
       serviceAccountName: {{ include "aces-ml-chart.serviceAccountName" . }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
-        seccompProfile:
-          type: RuntimeDefault
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-            readOnlyRootFilesystem: true
-            runAsNonRoot: true
-            runAsUser: 1000
-            seccompProfile:
-              type: RuntimeDefault
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          command: ["python3"]
-          args: ["-u", "/app/ML.py"]
-          envFrom:
-            - configMapRef:
-                name: {{ include "aces-ml-chart.fullname" . }}-config
+          {{- if .Values.command }}
+          command: {{ .Values.command }}
+          {{- end }}
+          {{- if .Values.args }}
+          args: {{ .Values.args }}
+          {{- end }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.service.port }}
               protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
             - name: model-volume
               mountPath: /app/models
+              readOnly: true
             - name: dataset-volume
-              mountPath: /app
+              mountPath: /app/data
+              readOnly: true
             - name: tmp-volume
               mountPath: /tmp
-              readOnly: false
+          {{- if .Values.env }}
+          env:
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- end }}
       volumes:
         - name: model-volume
-          {{- if .Values.modelStorage.persistentVolume.enabled }}
+          {{- if .Values.persistence.model.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "aces-ml-chart.fullname" . }}-model-pvc
+            claimName: {{ include "aces-ml-chart.fullname" . }}-model
           {{- else }}
-          emptyDir:
-            medium: Memory
-            sizeLimit: 1Gi
+          emptyDir: {}
           {{- end }}
         - name: dataset-volume
-          {{- if .Values.dataset.enabled }}
+          {{- if .Values.persistence.dataset.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "aces-ml-chart.fullname" . }}-dataset-pvc
+            claimName: {{ include "aces-ml-chart.fullname" . }}-dataset
+          {{- else }}
+          emptyDir: {}
           {{- end }}
         - name: tmp-volume
           emptyDir:
             medium: Memory
-            sizeLimit: 512Mi
-      {{- with .Values.nodeSelector }}
-      nodeSelector:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.tolerations }}
-      tolerations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+            sizeLimit: {{ .Values.temporaryStorage.sizeLimit }}
