@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "aces-ml-chart.fullname" . }}
+  name: {{ include "aces-ml.fullname" . }}
   labels:
-    {{- include "aces-ml-chart.labels" . | nindent 4 }}
+    {{- include "aces-ml.labels" . | nindent 4 }}
     {{- with .Values.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
@@ -11,11 +11,11 @@ spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "aces-ml-chart.selectorLabels" . | nindent 6 }}
+      {{- include "aces-ml.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "aces-ml-chart.selectorLabels" . | nindent 8 }}
+        {{- include "aces-ml.selectorLabels" . | nindent 8 }}
         {{- with .Values.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -24,13 +24,9 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
     spec:
-      serviceAccountName: {{ include "aces-ml-chart.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- if .Values.command }}
@@ -43,10 +39,6 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-          livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
-          readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -66,14 +58,14 @@ spec:
         - name: model-volume
           {{- if .Values.persistence.model.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "aces-ml-chart.fullname" . }}-model
+            claimName: {{ include "aces-ml.fullname" . }}-model
           {{- else }}
           emptyDir: {}
           {{- end }}
         - name: dataset-volume
           {{- if .Values.persistence.dataset.enabled }}
           persistentVolumeClaim:
-            claimName: {{ include "aces-ml-chart.fullname" . }}-dataset
+            claimName: {{ include "aces-ml.fullname" . }}-dataset
           {{- else }}
           emptyDir: {}
           {{- end }}

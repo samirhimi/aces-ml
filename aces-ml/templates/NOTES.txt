@@ -8,15 +8,15 @@ To learn more about the release, try:
   $ helm get all {{ .Release.Name }}
 
 The ML service can be accessed within your cluster at:
-  http://{{ include "aces-ml-chart.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+  http://{{ include "aces-ml.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
 
 The following volumes have been configured:
 {{- if .Values.persistence.model.enabled }}
-- Model storage: {{ include "aces-ml-chart.fullname" . }}-model ({{ .Values.persistence.model.size }})
+- Model storage: {{ include "aces-ml.fullname" . }}-model ({{ .Values.persistence.model.size }})
 {{- end }}
 {{- if .Values.persistence.dataset.enabled }}
-- Dataset storage: {{ include "aces-ml-chart.fullname" . }}-dataset ({{ .Values.persistence.dataset.size }})
+- Dataset storage: {{ include "aces-ml.fullname" . }}-dataset ({{ .Values.persistence.dataset.size }})
 {{- end }}
 
 To check the status of your pods, run:
-  kubectl get pods -l "app.kubernetes.io/name={{ include "aces-ml-chart.name" . }}" -n {{ .Release.Namespace }}
+  kubectl get pods -l "app.kubernetes.io/name={{ include "aces-ml.name" . }}" -n {{ .Release.Namespace }}

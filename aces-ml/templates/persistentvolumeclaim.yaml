@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "aces-ml-chart.fullname" . }}-model
+  name: {{ include "aces-ml.fullname" . }}-model
   labels:
-    {{- include "aces-ml-chart.labels" . | nindent 4 }}
+    {{- include "aces-ml.labels" . | nindent 4 }}
 spec:
   accessModes:
     - {{ .Values.persistence.model.accessMode }}
@@ -17,9 +17,9 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "aces-ml-chart.fullname" . }}-dataset
+  name: {{ include "aces-ml.fullname" . }}-dataset
   labels:
-    {{- include "aces-ml-chart.labels" . | nindent 4 }}
+    {{- include "aces-ml.labels" . | nindent 4 }}
 spec:
   accessModes:
     - {{ .Values.persistence.dataset.accessMode }}

@@ -1,4 +1,4 @@
-# Default values for aces-ml-chart.
+# Default values for aces-ml.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -8,15 +8,6 @@ image:
   repository: sami4rhimi/aces-ml
   tag: "1.0.3"
   pullPolicy: Always
-
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  create: false
-  name: ""
-
-podAnnotations: {}
 
 service:
   type: ClusterIP
@@ -49,5 +40,4 @@ env:
   - name: LOG_LEVEL
     value: "INFO"
 
-command: ["python3"]
-args: ["-u", "/app/ML.py"]
+

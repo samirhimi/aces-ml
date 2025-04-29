@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "aces-ml-chart.fullname" . }}
+  name: {{ include "aces-ml.fullname" . }}
   labels:
-    {{- include "aces-ml-chart.labels" . | nindent 4 }}
+    {{- include "aces-ml.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
   ports:
@@ -12,4 +12,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "aces-ml-chart.selectorLabels" . | nindent 4 }}
+    {{- include "aces-ml.selectorLabels" . | nindent 4 }}
