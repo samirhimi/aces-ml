@@ -1,0 +1,28 @@
+name: Sync to Azure DevOps
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v3
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Push to Azure DevOps
+        env:
+          AZURE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+        run: |
+          git remote add azure https://dev-org@dev.azure.com/dev-org/aces-ml/_git/aces-ml
+          git push --mirror https://$AZURE_PAT@dev.azure.com/dev-org/aces-ml/_git/aces-ml
+          git push azure --mirror
+
