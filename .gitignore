@@ -46,4 +46,3 @@ Thumbs.db
 .env.*
 !.env.example
 models/*.joblib
-final_dataset.csv
