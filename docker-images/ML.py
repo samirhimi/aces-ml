@@ -13,36 +13,82 @@ import os
 import time
 from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler, FileModifiedEvent
+from flask import Flask, request, jsonify
+import threading
+
+app = Flask(__name__)
 
 class ModelTrainer:
     def __init__(self):
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.model_lock = threading.Lock()
+        self.load_model()
+        
+    def load_model(self, model_dir="models"):
+        model_path = os.path.join(model_dir, "random_forest_model.joblib")
+        if os.path.exists(model_path):
+            with self.model_lock:
+                self.model = joblib.load(model_path)
+                print(f"✔️ Model loaded from {model_path}")
         
     def train(self, X_train, X_test, y_train, y_test):
         print("\n🔹 Training Random Forest model...")
         
-        # Train the model
-        self.model.fit(X_train, y_train)
-        
-        # Make predictions
-        y_pred = self.model.predict(X_test)
-        
-        # Calculate accuracy
-        accuracy = accuracy_score(y_test, y_pred)
-        print(f"🔹 Accuracy: {accuracy:.4f}")
-        
-        # Print classification report
-        print("🔹 Classification Report:")
-        print(classification_report(y_test, y_pred))
-        
-        # Save the model
-        self.save_model()
+        with self.model_lock:
+            # Train the model
+            self.model.fit(X_train, y_train)
+            
+            # Make predictions
+            y_pred = self.model.predict(X_test)
+            
+            # Calculate accuracy
+            accuracy = accuracy_score(y_test, y_pred)
+            print(f"🔹 Accuracy: {accuracy:.4f}")
+            
+            # Print classification report
+            print("🔹 Classification Report:")
+            print(classification_report(y_test, y_pred))
+            
+            # Save the model
+            self.save_model()
         
     def save_model(self, output_dir="models"):
         os.makedirs(output_dir, exist_ok=True)
         model_path = os.path.join(output_dir, "random_forest_model.joblib")
-        joblib.dump(self.model, model_path)
+        with self.model_lock:
+            joblib.dump(self.model, model_path)
         print(f"✔️ Model saved to {model_path}")
+    
+    def predict(self, features):
+        with self.model_lock:
+            return self.model.predict(features)
+
+# Create a global model trainer instance
+model_trainer = ModelTrainer()
+
+@app.route('/health')
+def health():
+    return jsonify({"status": "healthy"}), 200
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        data = request.json
+        features = pd.DataFrame(data['features'])
+        
+        # Ensure features match the expected format
+        features = features.apply(pd.to_numeric, errors='coerce')
+        features = features.fillna(0)
+        
+        # Make prediction
+        prediction = model_trainer.predict(features)
+        
+        return jsonify({
+            "prediction": prediction.tolist(),
+            "model_path": os.path.join("models", "random_forest_model.joblib")
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 class DatasetHandler(FileSystemEventHandler):
     def __init__(self):
@@ -105,7 +151,7 @@ class DatasetHandler(FileSystemEventHandler):
 def main():
     # Create the handler and observer
     handler = DatasetHandler()
-    observer = PollingObserver(timeout=1.0)  # Poll every second
+    observer = PollingObserver(timeout=1.0)
     print("🔧 Setting up file watcher with 1-second polling interval...")
     observer.schedule(handler, path=".", recursive=False)
     observer.start()
@@ -117,17 +163,9 @@ def main():
         print("📋 Found existing dataset, processing...")
         handler.process_dataset('final_dataset.csv')
     
-    try:
-        while True:
-            time.sleep(1)
-            # Debug: Check if file has changed
-            if os.path.exists('final_dataset.csv'):
-                mtime = os.path.getmtime('final_dataset.csv')
-                print(f"🔍 Checking dataset... Last modified: {time.ctime(mtime)}")
-    except KeyboardInterrupt:
-        observer.stop()
-        print("\n⚡ Stopping model training service...")
-    observer.join()
+    # Run Flask app
+    print("🚀 Starting API server...")
+    app.run(host='0.0.0.0', port=80)
 
 if __name__ == "__main__":
     main()
