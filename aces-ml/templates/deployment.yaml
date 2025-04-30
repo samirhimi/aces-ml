@@ -44,10 +44,8 @@ spec:
           volumeMounts:
             - name: model-volume
               mountPath: /app/models
-              readOnly: true
             - name: dataset-volume
               mountPath: /app/data
-              readOnly: true
             - name: tmp-volume
               mountPath: /tmp
           {{- if .Values.env }}
