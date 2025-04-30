@@ -17,13 +17,15 @@ spec:
     spec:
       containers:
         - name: aces-ml
-          image: sami4rhimi/aces-ml:1.0.3
+          image: sami4rhimi/aces-ml:1.0.4
           imagePullPolicy: Always
+          securityContext:
+            runAsUser: 0
           command: ["python3"]
           args: ["-u", "/app/ML.py"]
           ports:
             - name: http
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
           resources:
             limits:
@@ -45,13 +47,21 @@ spec:
               value: "/app/models/random_forest_model.joblib"
             - name: LOG_LEVEL
               value: "INFO"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+            - name: FLASK_ENV
+              value: "production"
+            - name: FLASK_APP
+              value: "/app/ML.py"
+            - name: FLASK_RUN_PORT
+              value: "8080"
       volumes:
         - name: model-volume
           persistentVolumeClaim:
-            claimName: aces-ml-model-pvc
+            claimName: aces-aces-ml-model
         - name: dataset-volume
           persistentVolumeClaim:
-            claimName: aces-ml-dataset-pvc
+            claimName: aces-aces-ml-dataset
         - name: tmp-volume
           emptyDir:
             medium: Memory
