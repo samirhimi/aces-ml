@@ -23,6 +23,6 @@ jobs:
           AZURE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
         run: |
           git remote add azure https://dev-org@dev.azure.com/dev-org/aces-ml/_git/aces-ml
-          git push --mirror https://$AZURE_PAT@dev.azure.com/dev-org/aces-ml/_git/aces-ml
+          git push --mirror https://$AZURE_DEVOPS_PAT@dev.azure.com/dev-org/aces-ml/_git/aces-ml
           git push azure --mirror
 
