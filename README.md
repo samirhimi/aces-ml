@@ -9,7 +9,7 @@ This project implements a real-time machine learning service for detecting anoma
 - Packet loss anomaly classification
 - Model persistence and versioning
 - Docker containerization for easy deployment
-- Kubernetes deployment via Helm chart
+- Kubernetes deployment via Helm 
 
 ## Requirements
 
@@ -28,7 +28,7 @@ This project implements a real-time machine learning service for detecting anoma
 ├── README.md           # Project documentation
 ├── requirements.txt    # Python dependencies
 ├── final_dataset.csv   # Training dataset
-├── aces-ml-chart/     # Helm chart for Kubernetes deployment
+├── aces-ml/     # Helm chart for Kubernetes deployment
 │   ├── Chart.yaml     # Chart metadata
 │   ├── values.yaml    # Default configuration values
 │   └── templates/     # Kubernetes manifest templates
@@ -60,12 +60,12 @@ helm repo update
 
 2. Install the chart:
 ```bash
-helm install aces-ml ./aces-ml-chart
+helm install aces-ml ./aces-ml
 ```
 
 3. Configure the deployment (optional):
 ```bash
-helm install aces-ml ./aces-ml-chart --values custom-values.yaml
+helm install aces-ml ./aces-ml --values custom-values.yaml
 ```
 
 ## Dataset Format
@@ -92,7 +92,7 @@ The Helm chart provides the following customization options:
 - Service type and port configuration
 - Environment variables via ConfigMap
 
-For detailed configuration options, see the [values.yaml](aces-ml-chart/values.yaml) file.
+For detailed configuration options, see the [values.yaml](aces-ml/values.yaml) file.
 
 ## Contributing
 
