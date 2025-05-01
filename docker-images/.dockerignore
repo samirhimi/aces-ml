@@ -78,5 +78,4 @@ Dockerfile
 final_dataset.csv.bak
 README.md
 LICENSE
-data_injection.py
 .dockerignore

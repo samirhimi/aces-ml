@@ -26,8 +26,8 @@ COPY . .
 
 
 
-# Add healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Add healthcheck with longer start period
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import os; exit(0 if os.path.exists('models/random_forest_model.joblib') else 1)"
 
 # Command to run the ML script
