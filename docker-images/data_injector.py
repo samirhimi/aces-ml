@@ -11,15 +11,29 @@ class MetricsInjector:
         self.csv_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), csv_file)
         print(f"Using dataset file: {self.csv_file}")
         
-        # Read the last row to continue from there
-        self.df = pd.read_csv(self.csv_file, low_memory=False)
-        if len(self.df) == 0:
-            raise ValueError("Dataset is empty")
-            
-        self.last_row = self.df.iloc[-1]
-        self.last_id = int(self.df.index[-1])
-        # Get timestamp from the second column (index 1)
-        self.last_timestamp = datetime.strptime(self.last_row.iloc[1], '%Y-%m-%d %H:%M:%S')
+        # Read the last row to continue from there, handle column mismatches
+        try:
+            self.df = pd.read_csv(self.csv_file, low_memory=False)
+            if len(self.df) == 0:
+                raise ValueError("Dataset is empty")
+                
+            # Ensure consistent number of columns
+            expected_cols = 265
+            if len(self.df.columns) > expected_cols:
+                print(f"⚠️ Found {len(self.df.columns)} columns, truncating to {expected_cols}")
+                self.df = self.df.iloc[:, :expected_cols]
+            elif len(self.df.columns) < expected_cols:
+                print(f"⚠️ Found {len(self.df.columns)} columns, padding to {expected_cols}")
+                for i in range(len(self.df.columns), expected_cols):
+                    self.df[f'col_{i}'] = 0
+                    
+            self.last_row = self.df.iloc[-1]
+            self.last_id = int(self.df.index[-1])
+            # Get timestamp from the second column (index 1)
+            self.last_timestamp = datetime.strptime(self.last_row.iloc[1], '%Y-%m-%d %H:%M:%S')
+        except Exception as e:
+            print(f"❌ Error initializing dataset: {str(e)}")
+            raise
 
     def generate_next_metrics(self):
         """Generate next set of metrics based on previous values with some variation"""

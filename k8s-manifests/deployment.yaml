@@ -17,10 +17,10 @@ spec:
     spec:
       containers:
         - name: aces-ml
-          image: sami4rhimi/aces-ml:1.0.6
+          image: sami4rhimi/aces-ml:1.0.7
           imagePullPolicy: Always
           command: ["python"]
-          args: ["-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
+          args: ["ML.py"]
           ports:
             - name: http
               containerPort: 8080
@@ -35,9 +35,9 @@ spec:
           volumeMounts:
             - name: model-volume
               mountPath: /app/models
-              readOnly: false
             - name: dataset-volume
-              mountPath: /app/data
+              mountPath: /app/final_dataset.csv
+              subPath: final_dataset.csv
             - name: tmp-volume
               mountPath: /tmp
               readOnly: false

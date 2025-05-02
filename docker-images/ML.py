@@ -30,27 +30,188 @@ with open('static/swagger.json', 'w') as f:
       "swagger": "2.0",
       "info": {
         "title": "ML Model Service API",
+        "description": "API for anomaly detection ML service that processes metrics and provides model predictions",
         "version": "1.0.0"
       },
+      "basePath": "/",
+      "schemes": ["http"],
+      "consumes": ["application/json"],
+      "produces": ["application/json"],
       "paths": {
         "/health": {
           "get": {
-            "summary": "Health check endpoint"
+            "tags": ["System"],
+            "summary": "Health check endpoint",
+            "description": "Returns the health status of the service",
+            "responses": {
+              "200": {
+                "description": "Service is healthy",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "healthy"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "/download-model": {
           "get": {
-            "summary": "Download the trained model"
+            "tags": ["Model"],
+            "summary": "Download the trained model",
+            "description": "Downloads the current trained model file",
+            "produces": ["application/octet-stream"],
+            "responses": {
+              "200": {
+                "description": "Model file",
+                "schema": {
+                  "type": "file"
+                }
+              },
+              "404": {
+                "description": "Model file not found",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Model file not found"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "/model-info": {
           "get": {
-            "summary": "Get information about the model"
+            "tags": ["Model"],
+            "summary": "Get model information",
+            "description": "Returns metadata about the currently loaded model",
+            "responses": {
+              "200": {
+                "description": "Model information",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "model_path": {
+                      "type": "string",
+                      "example": "models/random_forest_model.joblib"
+                    },
+                    "last_modified": {
+                      "type": "string",
+                      "example": "Wed May 2 16:45:00 2025"
+                    },
+                    "size_bytes": {
+                      "type": "integer",
+                      "example": 916002
+                    }
+                  }
+                }
+              },
+              "404": {
+                "description": "Model not found",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "/metrics": {
           "post": {
-            "summary": "Submit new metrics data"
+            "tags": ["Metrics"],
+            "summary": "Submit new metrics data",
+            "description": "Submit new metrics data for processing and model training",
+            "parameters": [
+              {
+                "in": "body",
+                "name": "metrics",
+                "description": "Metrics data to process",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "required": ["timestamp", "Abnormality class"],
+                  "properties": {
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2025-05-02 16:45:00"
+                    },
+                    "Abnormality class": {
+                      "type": "string",
+                      "enum": ["Normal", "Packet Loss", "CPU HOG", "MEM LEAK", "Packet Delay"],
+                      "example": "Normal"
+                    },
+                    "cpu_usage": {
+                      "type": "number",
+                      "format": "float",
+                      "example": 45.2
+                    },
+                    "memory_usage": {
+                      "type": "number",
+                      "format": "float",
+                      "example": 62.8
+                    },
+                    "network_latency": {
+                      "type": "number",
+                      "format": "float",
+                      "example": 12.5
+                    }
+                  }
+                }
+              }
+            ],
+            "responses": {
+              "200": {
+                "description": "Metrics received successfully",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Metrics received and queued for processing"
+                    }
+                  }
+                }
+              },
+              "400": {
+                "description": "Invalid request",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Missing required fields: timestamp, Abnormality class"
+                    }
+                  }
+                }
+              },
+              "500": {
+                "description": "Server error",
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -62,7 +223,11 @@ swaggerui_blueprint = get_swaggerui_blueprint(
     SWAGGER_URL,
     API_URL,
     config={
-        'app_name': "ML Model Service"
+        'app_name': "ML Model Service",
+        'dom_id': '#swagger-ui',
+        'deepLinking': True,
+        'showMutatedRequest': True,
+        'showRequestHeaders': True
     }
 )
 app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
@@ -203,6 +368,16 @@ def process_dataset(dataset_path, trainer):
             print(f"❌ Error: Required column 'Abnormality class' not found in dataset")
             print(f"Available columns: {df.columns.tolist()}")
             return
+            
+        # Ensure consistent number of columns
+        expected_cols = 265
+        if len(df.columns) > expected_cols:
+            print(f"⚠️ Found {len(df.columns)} columns, truncating to {expected_cols}")
+            df = df.iloc[:, :expected_cols]
+        elif len(df.columns) < expected_cols:
+            print(f"⚠️ Found {len(df.columns)} columns, padding to {expected_cols}")
+            for i in range(len(df.columns), expected_cols):
+                df[f'col_{i}'] = 0
             
         df = df.dropna(subset=['Abnormality class'])
         print("📌 Data shape:", df.shape)
