@@ -13,8 +13,16 @@ from flask_swagger_ui import get_swaggerui_blueprint
 import threading
 import socket
 import psutil
+from datetime import datetime
+import queue
 
 app = Flask(__name__)
+
+# Create a queue for new metrics
+metrics_queue = queue.Queue()
+
+# Create an event to signal training thread to stop
+stop_training = threading.Event()
 
 os.makedirs('static', exist_ok=True)
 with open('static/swagger.json', 'w') as f:
@@ -39,6 +47,11 @@ with open('static/swagger.json', 'w') as f:
           "get": {
             "summary": "Get information about the model"
           }
+        },
+        "/metrics": {
+          "post": {
+            "summary": "Submit new metrics data"
+          }
         }
       }
     }''')
@@ -58,10 +71,12 @@ class ModelTrainer:
     def __init__(self):
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
         self.model_lock = threading.Lock()
+        self.dataset_lock = threading.Lock()
+        self.training = False
+        self.dataset_path = 'final_dataset.csv'
         self.load_model()
 
     def load_model(self, model_dir="models"):
-        # FIXED: Create models directory if it doesn't exist
         os.makedirs(model_dir, exist_ok=True)
         model_path = os.path.join(model_dir, "random_forest_model.joblib")
         if os.path.exists(model_path):
@@ -71,16 +86,43 @@ class ModelTrainer:
         else:
             print(f"⚠️ No existing model found at {model_path}, will train a new one")
 
+    def append_metrics(self, metrics_data):
+        """Append new metrics to the dataset file"""
+        with self.dataset_lock:
+            df = pd.DataFrame([metrics_data])
+            df.to_csv(self.dataset_path, mode='a', header=False, index=False)
+            print(f"✔️ Appended new metrics to {self.dataset_path}")
+
+    def should_train(self):
+        """Check if we should retrain the model"""
+        try:
+            if not os.path.exists(self.dataset_path):
+                return False
+            df = pd.read_csv(self.dataset_path)
+            # Train if we have at least 100 new records
+            return len(df) >= 100
+        except Exception as e:
+            print(f"Error checking dataset: {str(e)}")
+            return False
+
     def train(self, X_train, X_test, y_train, y_test):
-        print("\n🔹 Training Random Forest model...")
-        with self.model_lock:
-            self.model.fit(X_train, y_train)
-            y_pred = self.model.predict(X_test)
-            accuracy = accuracy_score(y_test, y_pred)
-            print(f"🔹 Accuracy: {accuracy:.4f}")
-            print("🔹 Classification Report:")
-            print(classification_report(y_test, y_pred))
-            self.save_model()
+        if self.training:
+            print("⚠️ Training already in progress, skipping...")
+            return
+            
+        self.training = True
+        try:
+            print("\n🔹 Training Random Forest model...")
+            with self.model_lock:
+                self.model.fit(X_train, y_train)
+                y_pred = self.model.predict(X_test)
+                accuracy = accuracy_score(y_test, y_pred)
+                print(f"🔹 Accuracy: {accuracy:.4f}")
+                print("🔹 Classification Report:")
+                print(classification_report(y_test, y_pred))
+                self.save_model()
+        finally:
+            self.training = False
 
     def save_model(self, output_dir="models"):
         try:
@@ -197,6 +239,21 @@ def process_dataset(dataset_path, trainer):
     except Exception as e:
         print(f"❌ Error processing dataset: {str(e)}")
 
+def process_metrics_queue():
+    """Background thread to process metrics and retrain model"""
+    while not stop_training.is_set():
+        try:
+            metrics = metrics_queue.get(timeout=5)  # Wait up to 5 seconds for new metrics
+            trainer.append_metrics(metrics)
+            
+            if trainer.should_train():
+                process_dataset(trainer.dataset_path, trainer)
+                
+        except queue.Empty:
+            continue
+        except Exception as e:
+            print(f"Error processing metrics: {str(e)}")
+
 @app.route('/health')
 def health():
     return jsonify({"status": "healthy"}), 200
@@ -233,6 +290,26 @@ def model_info():
     else:
         return jsonify({"error": "Model file not found"}), 404
 
+@app.route('/metrics', methods=['POST'])
+def receive_metrics():
+    try:
+        metrics = request.json
+        if not metrics:
+            return jsonify({"error": "No metrics data provided"}), 400
+            
+        # Validate required fields
+        required_fields = ['timestamp', 'Abnormality class']  # Add your required metrics fields
+        missing_fields = [field for field in required_fields if field not in metrics]
+        if missing_fields:
+            return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
+            
+        # Add metrics to processing queue
+        metrics_queue.put(metrics)
+        return jsonify({"status": "success", "message": "Metrics received and queued for processing"}), 200
+        
+    except Exception as e:
+        return jsonify({"error": f"Error processing metrics: {str(e)}"}), 500
+
 # FIXED: Add port availability check
 def is_port_available(port, host='0.0.0.0'):
     """Check if a port is available on the given host."""
@@ -268,20 +345,29 @@ def main():
             print("Please install them using: pip install " + " ".join(missing_libraries))
             return
             
+        global trainer
         trainer = ModelTrainer()
+        
+        # Start metrics processing thread
+        metrics_thread = threading.Thread(target=process_metrics_queue, daemon=True)
+        metrics_thread.start()
+        
         if os.path.exists('final_dataset.csv'):
             print("📋 Found existing dataset, processing...")
             process_dataset('final_dataset.csv', trainer)
         else:
-            print("⚠️ Dataset 'final_dataset.csv' not found. The API will be started without training.")
+            print("⚠️ Dataset 'final_dataset.csv' not found. Creating new dataset.")
+            # Create empty dataset with headers
+            pd.DataFrame(columns=['timestamp', 'Abnormality class']).to_csv('final_dataset.csv', index=False)
         
         port = find_available_port(8080)
         print(f"🚀 Starting API server on port {port} (with Swagger)...")
         app.run(host='0.0.0.0', port=port, debug=False)
-    except OSError as e:
-        print(f"❌ Failed to start server: {e}")
+        
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"❌ Error in main: {str(e)}")
+    finally:
+        stop_training.set()  # Signal the training thread to stop
 
 if __name__ == "__main__":
     main()

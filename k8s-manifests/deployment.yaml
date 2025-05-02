@@ -17,10 +17,10 @@ spec:
     spec:
       containers:
         - name: aces-ml
-          image: sami4rhimi/aces-ml:1.0.4
+          image: sami4rhimi/aces-ml:1.0.6
           imagePullPolicy: Always
-          command: ["flask"]
-          args: ["run", "--host=0.0.0.0", "--port=8080"]
+          command: ["python"]
+          args: ["-m", "flask", "run", "--host=0.0.0.0", "--port=8080"]
           ports:
             - name: http
               containerPort: 8080
@@ -35,6 +35,7 @@ spec:
           volumeMounts:
             - name: model-volume
               mountPath: /app/models
+              readOnly: false
             - name: dataset-volume
               mountPath: /app/data
             - name: tmp-volume
@@ -46,18 +47,18 @@ spec:
             - name: LOG_LEVEL
               value: "INFO"
             - name: FLASK_ENV
-              value: "development"
+              value: "production"
             - name: FLASK_APP
-              value: "/app/ML.py"
-            - name: FLASK_RUN_PORT
-              value: "8080"
+              value: "ML.py"
+            - name: PYTHONUNBUFFERED
+              value: "1"
       volumes:
         - name: model-volume
           persistentVolumeClaim:
-            claimName: aces-aces-ml-model
+            claimName: aces-ml-model
         - name: dataset-volume
           persistentVolumeClaim:
-            claimName: aces-aces-ml-dataset
+            claimName: aces-ml-dataset
         - name: tmp-volume
           emptyDir:
             medium: Memory
