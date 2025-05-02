@@ -14,9 +14,9 @@ service:
   name: aces-ml
   port: 80
   targetPort: 8080
+  name: http
   protocol: TCP
   
-
 resources:
   limits:
     cpu: 1000m
@@ -37,11 +37,6 @@ persistence:
 
 temporaryStorage:
   sizeLimit: 512Mi
-
-env:
-  - name: ML_MODEL_PATH
-    value: "/app/models/random_forest_model.joblib"
-  - name: LOG_LEVEL
-    value: "INFO"
+  
 
 

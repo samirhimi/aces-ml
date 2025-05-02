@@ -39,6 +39,17 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
+          env:
+            - name: ML_MODEL_PATH
+              value: "/app/models/model_files/random_forest_model.joblib"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: FLASK_ENV
+              value: "production"
+            - name: FLASK_APP
+              value: "ML.py"
+            - name: PYTHONUNBUFFERED
+              value: "1"
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
