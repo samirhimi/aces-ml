@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aces-ml
+  namespace: aces-ml
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  labels:
+    app: aces-ml
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - aces-ml.98.66.221.96.nip.io
+    secretName: aces-tls-secret
+  rules:
+  - host: aces-ml.98.66.221.96.nip.io
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: aces-ml
+            port: 
+              number: 80
