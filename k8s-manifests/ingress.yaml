@@ -16,6 +16,8 @@ metadata:
     kubernetes.azure.com/health-probe-healthy-threshold: "2"
     kubernetes.azure.com/health-probe-unhealthy-threshold: "5"
     kubernetes.azure.com/health-probe-protocol: "https"   
+    nginx.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
   labels:
     app: aces-ml
