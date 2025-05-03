@@ -4,20 +4,29 @@ metadata:
   name: aces-ml
   namespace: aces-ml
   annotations:
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    kubernetes.azure.com/static-ip: "true"
+    kubernetes.azure.com/backend-protocol: "https"
+    kubernetes.azure.com/ssl-redirect: "true"
+    kubernetes.azure.com/enable-caching: "true"
+    kubernetes.azure.com/caching: "true"
+    kubernetes.azure.com/health-probe: "true"
+    kubernetes.azure.com/health-probe-path: "/health"
+    kubernetes.azure.com/health-probe-interval: "30"
+    kubernetes.azure.com/health-probe-timeout: "30"
+    kubernetes.azure.com/health-probe-healthy-threshold: "2"
+    kubernetes.azure.com/health-probe-unhealthy-threshold: "5"
+    kubernetes.azure.com/health-probe-protocol: "https"   
+    kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
   labels:
     app: aces-ml
 spec:
-  ingressClassName: nginx
+  ingressClassName: webapprouting.kubernetes.azure.com
   tls:
   - hosts:
-    - aces-ml.98.66.221.96.nip.io
+    - aces-ml.172.189.152.57.nip.io
     secretName: aces-tls-secret
   rules:
-  - host: aces-ml.98.66.221.96.nip.io
+  - host: aces-ml.172.189.152.57.nip.io
     http:
       paths:
       - pathType: Prefix
