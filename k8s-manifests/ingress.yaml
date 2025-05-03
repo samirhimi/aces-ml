@@ -5,17 +5,10 @@ metadata:
   namespace: aces-ml
   annotations:
     kubernetes.azure.com/static-ip: "true"
-    kubernetes.azure.com/backend-protocol: "https"
-    kubernetes.azure.com/ssl-redirect: "true"
+    # kubernetes.azure.com/ssl-redirect: "true"
+    # kubernetes.azure.com/ssl-force-redirect: "true" 
     kubernetes.azure.com/enable-caching: "true"
     kubernetes.azure.com/caching: "true"
-    kubernetes.azure.com/health-probe: "true"
-    kubernetes.azure.com/health-probe-path: "/health"
-    kubernetes.azure.com/health-probe-interval: "30"
-    kubernetes.azure.com/health-probe-timeout: "30"
-    kubernetes.azure.com/health-probe-healthy-threshold: "2"
-    kubernetes.azure.com/health-probe-unhealthy-threshold: "5"
-    kubernetes.azure.com/health-probe-protocol: "https"   
     nginx.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
