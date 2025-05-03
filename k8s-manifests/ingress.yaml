@@ -5,12 +5,12 @@ metadata:
   namespace: aces-ml
   annotations:
     kubernetes.azure.com/static-ip: "true"
-    # kubernetes.azure.com/ssl-redirect: "true"
-    # kubernetes.azure.com/ssl-force-redirect: "true" 
+    kubernetes.azure.com/ssl-redirect: "true"
+    kubernetes.azure.com/ssl-force-redirect: "true" 
     kubernetes.azure.com/enable-caching: "true"
     kubernetes.azure.com/caching: "true"
-    nginx.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    # nginx.kubernetes.io/ssl-redirect: "true"
+    # nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
   labels:
     app: aces-ml
