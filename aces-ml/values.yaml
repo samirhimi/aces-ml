@@ -11,9 +11,6 @@ image:
 
 service:
   type: ClusterIP
-  name: aces-ml
-  selector:
-    app: aces-ml
   port: 80
   targetPort: 8080
   protocol: TCP
@@ -38,7 +35,6 @@ ingress:
     kubernetes.azure.com/health-probe-healthy-threshold: "2"
     kubernetes.azure.com/health-probe-unhealthy-threshold: "5"
     kubernetes.azure.com/health-probe-protocol: "https"
-
 
 
 resources:

@@ -36,8 +36,8 @@ spec:
           args: {{ .Values.args }}
           {{- end }}
           ports:
-            - name: http
-              containerPort: {{ .Values.service.port }}
+            - port: {{ .Values.service.port }}
+              containerPort: {{ .Values.service.targetPort }}
               protocol: TCP
           env:
             - name: ML_MODEL_PATH
