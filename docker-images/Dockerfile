@@ -1,8 +1,5 @@
 FROM python:3.9-slim
 
-# Add security labels
-LABEL org.opencontainers.image.source="https://github.com/samirhimi/aces-ml"
-
 
 WORKDIR /app
 
@@ -23,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 
 # Copy the application code and dataset
 COPY . .
-
 
 
 # Add healthcheck with longer start period
