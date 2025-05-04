@@ -5,42 +5,71 @@ metadata:
   namespace: aces-ml
   labels:
     app: aces-ml
+    app.kubernetes.io/instance: aces-ml
+    app.kubernetes.io/name: aces-ml
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: aces-ml
+      app.kubernetes.io/instance: aces-ml
+      app.kubernetes.io/name: aces-ml
   template:
     metadata:
       labels:
         app: aces-ml
+        app.kubernetes.io/instance: aces-ml
+        app.kubernetes.io/name: aces-ml
     spec:
+      initContainers:
+        - name: init-dirs
+          image: busybox
+          command: ['sh', '-c', 'mkdir -p /app/data /app/models && chmod -R 777 /app/data /app/models']
+          volumeMounts:
+            - name: dataset-volume
+              mountPath: /app/data
+            - name: model-volume
+              mountPath: /app/models
       containers:
         - name: aces-ml
-          image: sami4rhimi/aces-ml:1.0.7
-          imagePullPolicy: IfNotPresent
+          image: sami4rhimi/aces-ml:1.0.15
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080
               protocol: TCP
           resources:
             limits:
-              cpu: "1000m"
-              memory: "2Gi"
+              cpu: "1500m"
+              memory: "3Gi"
             requests:
-              cpu: "500m"
-              memory: "1Gi"
+              cpu: "750m"
+              memory: "1.5Gi"
           volumeMounts:
             - name: dataset-volume
-              mountPath: /app/dataset/final_dataset.csv
-              subPath: final_dataset.csv
+              mountPath: /app/data
             - name: model-volume
-              mountPath: /app/models/model_files
+              mountPath: /app/models
+            - name: backup-volume
+              mountPath: /app/csv_backups
             - name: tmp-volume
               mountPath: /tmp
           env:
             - name: ML_MODEL_PATH
-              value: "/app/models/model_files/random_forest_model.joblib"
+              value: "/app/models/random_forest_model.joblib"
+            - name: DATASET_PATH
+              value: "/app/data/final_dataset.csv"
+            - name: MIN_SAMPLES_FOR_TRAINING
+              value: "1"
+            - name: BATCH_SIZE
+              value: "5"
+            - name: BATCH_TIMEOUT
+              value: "1.0"
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: aces-ml-secret
+                  key: api-token
             - name: LOG_LEVEL
               value: "INFO"
             - name: FLASK_ENV
@@ -49,6 +78,18 @@ spec:
               value: "ML.py"
             - name: PYTHONUNBUFFERED
               value: "1"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
       volumes:
         - name: dataset-volume
           persistentVolumeClaim:
@@ -56,6 +97,8 @@ spec:
         - name: model-volume
           persistentVolumeClaim:
             claimName: aces-ml-model
+        - name: backup-volume
+          emptyDir: {}
         - name: tmp-volume
           emptyDir:
             medium: Memory

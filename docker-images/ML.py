@@ -8,13 +8,16 @@ from sklearn.metrics import classification_report, accuracy_score
 import joblib
 import os
 import time
+import shutil
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_file
-from flask_swagger_ui import get_swaggerui_blueprint
+from functools import wraps
 import threading
 import socket
 import psutil
-from datetime import datetime
 import queue
+from werkzeug.utils import secure_filename
+import io
 
 app = Flask(__name__)
 
@@ -24,213 +27,31 @@ metrics_queue = queue.Queue()
 # Create an event to signal training thread to stop
 stop_training = threading.Event()
 
-os.makedirs('static', exist_ok=True)
-with open('static/swagger.json', 'w') as f:
-    f.write('''{
-      "swagger": "2.0",
-      "info": {
-        "title": "ML Model Service API",
-        "description": "API for anomaly detection ML service that processes metrics and provides model predictions",
-        "version": "1.0.0"
-      },
-      "basePath": "/",
-      "schemes": ["http"],
-      "consumes": ["application/json"],
-      "produces": ["application/json"],
-      "paths": {
-        "/health": {
-          "get": {
-            "tags": ["System"],
-            "summary": "Health check endpoint",
-            "description": "Returns the health status of the service",
-            "responses": {
-              "200": {
-                "description": "Service is healthy",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "healthy"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "/download-model": {
-          "get": {
-            "tags": ["Model"],
-            "summary": "Download the trained model",
-            "description": "Downloads the current trained model file",
-            "produces": ["application/octet-stream"],
-            "responses": {
-              "200": {
-                "description": "Model file",
-                "schema": {
-                  "type": "file"
-                }
-              },
-              "404": {
-                "description": "Model file not found",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Model file not found"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "/model-info": {
-          "get": {
-            "tags": ["Model"],
-            "summary": "Get model information",
-            "description": "Returns metadata about the currently loaded model",
-            "responses": {
-              "200": {
-                "description": "Model information",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "model_path": {
-                      "type": "string",
-                      "example": "models/random_forest_model.joblib"
-                    },
-                    "last_modified": {
-                      "type": "string",
-                      "example": "Wed May 2 16:45:00 2025"
-                    },
-                    "size_bytes": {
-                      "type": "integer",
-                      "example": 916002
-                    }
-                  }
-                }
-              },
-              "404": {
-                "description": "Model not found",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "/metrics": {
-          "post": {
-            "tags": ["Metrics"],
-            "summary": "Submit new metrics data",
-            "description": "Submit new metrics data for processing and model training",
-            "parameters": [
-              {
-                "in": "body",
-                "name": "metrics",
-                "description": "Metrics data to process",
-                "required": true,
-                "schema": {
-                  "type": "object",
-                  "required": ["timestamp", "Abnormality class"],
-                  "properties": {
-                    "timestamp": {
-                      "type": "string",
-                      "format": "date-time",
-                      "example": "2025-05-02 16:45:00"
-                    },
-                    "Abnormality class": {
-                      "type": "string",
-                      "enum": ["Normal", "Packet Loss", "CPU HOG", "MEM LEAK", "Packet Delay"],
-                      "example": "Normal"
-                    },
-                    "cpu_usage": {
-                      "type": "number",
-                      "format": "float",
-                      "example": 45.2
-                    },
-                    "memory_usage": {
-                      "type": "number",
-                      "format": "float",
-                      "example": 62.8
-                    },
-                    "network_latency": {
-                      "type": "number",
-                      "format": "float",
-                      "example": 12.5
-                    }
-                  }
-                }
-              }
-            ],
-            "responses": {
-              "200": {
-                "description": "Metrics received successfully",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "example": "success"
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Metrics received and queued for processing"
-                    }
-                  }
-                }
-              },
-              "400": {
-                "description": "Invalid request",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string",
-                      "example": "Missing required fields: timestamp, Abnormality class"
-                    }
-                  }
-                }
-              },
-              "500": {
-                "description": "Server error",
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }''')
-
-SWAGGER_URL = '/swagger'
-API_URL = '/static/swagger.json'
-swaggerui_blueprint = get_swaggerui_blueprint(
-    SWAGGER_URL,
-    API_URL,
-    config={
-        'app_name': "ML Model Service",
-        'dom_id': '#swagger-ui',
-        'deepLinking': True,
-        'showMutatedRequest': True,
-        'showRequestHeaders': True
-    }
-)
-app.register_blueprint(swaggerui_blueprint, url_prefix=SWAGGER_URL)
+def require_api_token(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        api_token = os.getenv('API_TOKEN')
+        if not api_token:
+            return jsonify({"error": "API token not configured"}), 500
+            
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({"error": "Authorization header is missing"}), 401
+            
+        try:
+            # Extract token from "Bearer <token>"
+            token_type, token = auth_header.split(' ')
+            if token_type.lower() != 'bearer':
+                return jsonify({"error": "Invalid authorization type. Use 'Bearer <token>'"}), 401
+                
+            if token != api_token:
+                return jsonify({"error": "Invalid API token"}), 401
+                
+        except ValueError:
+            return jsonify({"error": "Invalid authorization format. Use 'Bearer <token>'"}), 401
+            
+        return f(*args, **kwargs)
+    return decorated_function
 
 class ModelTrainer:
     def __init__(self):
@@ -238,8 +59,15 @@ class ModelTrainer:
         self.model_lock = threading.Lock()
         self.dataset_lock = threading.Lock()
         self.training = False
-        self.dataset_path = 'final_dataset.csv'
+        self.dataset_path = os.getenv('DATASET_PATH', 'final_dataset.csv')
+        self.backup_dir = 'csv_backups'
+        self.min_samples_for_training = int(os.getenv('MIN_SAMPLES_FOR_TRAINING', '1'))
+        self.last_training_time = None
+        os.makedirs(self.backup_dir, exist_ok=True)
         self.load_model()
+        # Start CSV cleanup thread
+        self.cleanup_thread = threading.Thread(target=self.cleanup_old_files, daemon=True)
+        self.cleanup_thread.start()
 
     def load_model(self, model_dir="models"):
         os.makedirs(model_dir, exist_ok=True)
@@ -251,9 +79,36 @@ class ModelTrainer:
         else:
             print(f"⚠️ No existing model found at {model_path}, will train a new one")
 
+    def backup_current_dataset(self):
+        """Backup the current dataset with timestamp"""
+        if os.path.exists(self.dataset_path):
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            backup_filename = f'final_dataset_{timestamp}.csv'
+            backup_path = os.path.join(self.backup_dir, backup_filename)
+            shutil.copy2(self.dataset_path, backup_path)
+            print(f"✔️ Dataset backed up to {backup_path}")
+
+    def cleanup_old_files(self):
+        """Cleanup files older than 1 day in the backup directory"""
+        while not stop_training.is_set():
+            try:
+                current_time = datetime.now()
+                for filename in os.listdir(self.backup_dir):
+                    file_path = os.path.join(self.backup_dir, filename)
+                    file_modified_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                    if current_time - file_modified_time > timedelta(days=1):
+                        os.remove(file_path)
+                        print(f"🗑️ Removed old backup file: {filename}")
+            except Exception as e:
+                print(f"Error during file cleanup: {str(e)}")
+            # Sleep for 1 hour before next cleanup check
+            time.sleep(3600)
+
     def append_metrics(self, metrics_data):
         """Append new metrics to the dataset file"""
         with self.dataset_lock:
+            # Backup current dataset before appending new data
+            self.backup_current_dataset()
             df = pd.DataFrame([metrics_data])
             df.to_csv(self.dataset_path, mode='a', header=False, index=False)
             print(f"✔️ Appended new metrics to {self.dataset_path}")
@@ -264,8 +119,13 @@ class ModelTrainer:
             if not os.path.exists(self.dataset_path):
                 return False
             df = pd.read_csv(self.dataset_path)
-            # Train if we have at least 100 new records
-            return len(df) >= 100
+            
+            # Always train if we have at least min_samples_for_training records
+            if len(df) >= self.min_samples_for_training:
+                # If this is the first training or we have new data
+                if not self.last_training_time or os.path.getmtime(self.dataset_path) > self.last_training_time:
+                    return True
+            return False
         except Exception as e:
             print(f"Error checking dataset: {str(e)}")
             return False
@@ -285,7 +145,11 @@ class ModelTrainer:
                 print(f"🔹 Accuracy: {accuracy:.4f}")
                 print("🔹 Classification Report:")
                 print(classification_report(y_test, y_pred))
-                self.save_model()
+                success = self.save_model()
+                if success:
+                    self.last_training_time = time.time()
+                    # Broadcast model update through a socket or event system
+                    print("✨ New model is now available")
         finally:
             self.training = False
 
@@ -335,6 +199,7 @@ class ModelTrainer:
                     size = os.path.getsize(model_path)
                     print(f"✔️ Model saved successfully to {model_path} (size: {size:,} bytes)")
                     print(f"📁 Final file permissions: {oct(os.stat(model_path).st_mode)[-3:]}")
+                    return True
                 else:
                     raise FileNotFoundError(f"Model file not found after moving from temporary location")
             except Exception as save_error:
@@ -356,11 +221,17 @@ class ModelTrainer:
                 print(f"(unable to list directory: {str(dir_error)})")
             print("📁 Directory listing of current directory:")
             print(os.listdir('.'))
+            return False
 
 def process_dataset(dataset_path, trainer):
     time.sleep(1)
     try:
         print(f"📌 Processing dataset: {dataset_path}")
+        
+        # Ensure model directory exists
+        model_dir = os.path.dirname(trainer.ML_MODEL_PATH)
+        os.makedirs(model_dir, exist_ok=True)
+        
         df = pd.read_csv(dataset_path, low_memory=False)
         
         # Check if 'Abnormality class' column exists
@@ -413,21 +284,49 @@ def process_dataset(dataset_path, trainer):
         trainer.train(X_train, X_test, y_train, y_test)
     except Exception as e:
         print(f"❌ Error processing dataset: {str(e)}")
+        print(f"📁 Current working directory: {os.getcwd()}")
+        print(f"📁 Dataset path: {dataset_path}")
+        print(f"📁 Dataset exists: {os.path.exists(dataset_path)}")
+        if os.path.exists(dataset_path):
+            print(f"📁 Dataset permissions: {oct(os.stat(dataset_path).st_mode)[-3:]}")
+            print(f"📁 Dataset size: {os.path.getsize(dataset_path)} bytes")
 
 def process_metrics_queue():
     """Background thread to process metrics and retrain model"""
+    batch_size = int(os.getenv('BATCH_SIZE', '1'))
+    batch_timeout = float(os.getenv('BATCH_TIMEOUT', '1.0'))
+    batch = []
+    last_process_time = time.time()
+
     while not stop_training.is_set():
         try:
-            metrics = metrics_queue.get(timeout=5)  # Wait up to 5 seconds for new metrics
-            trainer.append_metrics(metrics)
-            
-            if trainer.should_train():
-                process_dataset(trainer.dataset_path, trainer)
-                
-        except queue.Empty:
-            continue
+            # Try to get a metric, wait up to batch_timeout seconds
+            try:
+                metric = metrics_queue.get(timeout=batch_timeout)
+                batch.append(metric)
+            except queue.Empty:
+                # If we have any items in the batch, process them
+                if batch:
+                    for item in batch:
+                        trainer.append_metrics(item)
+                    if trainer.should_train():
+                        process_dataset(trainer.dataset_path, trainer)
+                    batch = []
+                continue
+
+            # If we've reached batch size or batch timeout, process the batch
+            current_time = time.time()
+            if len(batch) >= batch_size or (current_time - last_process_time) >= batch_timeout:
+                for item in batch:
+                    trainer.append_metrics(item)
+                if trainer.should_train():
+                    process_dataset(trainer.dataset_path, trainer)
+                batch = []
+                last_process_time = current_time
+
         except Exception as e:
             print(f"Error processing metrics: {str(e)}")
+            batch = []  # Clear batch on error
 
 @app.route('/health')
 def health():
@@ -465,27 +364,92 @@ def model_info():
     else:
         return jsonify({"error": "Model file not found"}), 404
 
+@app.route('/model-status', methods=['GET'])
+def model_status():
+    """Get the current model status including last training time"""
+    model_path = os.path.join("models", "random_forest_model.joblib")
+    if os.path.exists(model_path):
+        file_stats = os.stat(model_path)
+        last_modified = file_stats.st_mtime
+        return jsonify({
+            "status": "available",
+            "last_modified": time.ctime(last_modified),
+            "last_modified_timestamp": last_modified,
+            "size_bytes": file_stats.st_size,
+            "last_training_time": trainer.last_training_time,
+            "is_training": trainer.training
+        })
+    else:
+        return jsonify({
+            "status": "unavailable",
+            "is_training": trainer.training
+        })
+
 @app.route('/metrics', methods=['POST'])
+@require_api_token
 def receive_metrics():
     try:
-        metrics = request.json
-        if not metrics:
-            return jsonify({"error": "No metrics data provided"}), 400
+        if 'file' in request.files:
+            file = request.files['file']
+            if file.filename == '':
+                return jsonify({"error": "No file selected"}), 400
+                
+            if not file.filename.endswith('.csv'):
+                return jsonify({"error": "Only CSV files are supported"}), 400
+                
+            # Read CSV file
+            try:
+                # Read CSV file into memory
+                stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+                df = pd.read_csv(stream)
+                
+                # Validate required columns
+                required_fields = ['timestamp', 'Abnormality class']
+                missing_fields = [field for field in required_fields if field not in df.columns]
+                if missing_fields:
+                    return jsonify({"error": f"Missing required columns in CSV: {', '.join(missing_fields)}"}), 400
+                
+                # Process each row
+                records_processed = 0
+                for _, row in df.iterrows():
+                    metrics_queue.put(row.to_dict())
+                    records_processed += 1
+                
+                return jsonify({
+                    "status": "success",
+                    "message": "CSV file processed successfully",
+                    "records_processed": records_processed
+                }), 200
+                
+            except pd.errors.EmptyDataError:
+                return jsonify({"error": "The CSV file is empty"}), 400
+            except Exception as e:
+                return jsonify({"error": f"Error processing CSV file: {str(e)}"}), 400
+                
+        elif request.is_json:
+            metrics = request.json
+            if not metrics:
+                return jsonify({"error": "No metrics data provided"}), 400
+                
+            # Validate required fields
+            required_fields = ['timestamp', 'Abnormality class']
+            missing_fields = [field for field in required_fields if field not in metrics]
+            if missing_fields:
+                return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
+                
+            # Add metrics to processing queue
+            metrics_queue.put(metrics)
+            return jsonify({
+                "status": "success",
+                "message": "Metrics received and queued for processing",
+                "records_processed": 1
+            }), 200
+        else:
+            return jsonify({"error": "Request must be either JSON data or a CSV file"}), 400
             
-        # Validate required fields
-        required_fields = ['timestamp', 'Abnormality class']  # Add your required metrics fields
-        missing_fields = [field for field in required_fields if field not in metrics]
-        if missing_fields:
-            return jsonify({"error": f"Missing required fields: {', '.join(missing_fields)}"}), 400
-            
-        # Add metrics to processing queue
-        metrics_queue.put(metrics)
-        return jsonify({"status": "success", "message": "Metrics received and queued for processing"}), 200
-        
     except Exception as e:
-        return jsonify({"error": f"Error processing metrics: {str(e)}"}), 500
+        return jsonify({"error": f"Error processing request: {str(e)}"}), 500
 
-# FIXED: Add port availability check
 def is_port_available(port, host='0.0.0.0'):
     """Check if a port is available on the given host."""
     try:
@@ -506,7 +470,7 @@ def find_available_port(start_port=8080, max_attempts=10):
 def main():
     try:
         # Verify required libraries are installed
-        required_libraries = ['pandas', 'numpy', 'sklearn', 'joblib', 'flask', 'flask_swagger_ui']
+        required_libraries = ['pandas', 'numpy', 'sklearn', 'joblib', 'flask']
         missing_libraries = []
         
         for lib in required_libraries:
@@ -515,7 +479,7 @@ def main():
             except ImportError:
                 missing_libraries.append(lib)
         
-        if missing_libraries:
+        if (missing_libraries):
             print(f"❌ Error: Missing required libraries: {', '.join(missing_libraries)}")
             print("Please install them using: pip install " + " ".join(missing_libraries))
             return
@@ -527,16 +491,17 @@ def main():
         metrics_thread = threading.Thread(target=process_metrics_queue, daemon=True)
         metrics_thread.start()
         
-        if os.path.exists('final_dataset.csv'):
-            print("📋 Found existing dataset, processing...")
-            process_dataset('final_dataset.csv', trainer)
+        if os.path.exists(trainer.dataset_path):
+            print(f"📋 Found existing dataset at {trainer.dataset_path}, processing...")
+            process_dataset(trainer.dataset_path, trainer)
         else:
-            print("⚠️ Dataset 'final_dataset.csv' not found. Creating new dataset.")
+            print(f"⚠️ Dataset '{trainer.dataset_path}' not found. Creating new dataset.")
             # Create empty dataset with headers
-            pd.DataFrame(columns=['timestamp', 'Abnormality class']).to_csv('final_dataset.csv', index=False)
+            os.makedirs(os.path.dirname(trainer.dataset_path), exist_ok=True)
+            pd.DataFrame(columns=['timestamp', 'Abnormality class']).to_csv(trainer.dataset_path, index=False)
         
         port = find_available_port(8080)
-        print(f"🚀 Starting API server on port {port} (with Swagger)...")
+        print(f"🚀 Starting API server on port {port}...")
         app.run(host='0.0.0.0', port=port, debug=False)
         
     except Exception as e:

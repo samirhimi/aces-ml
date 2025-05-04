@@ -1,0 +1,19 @@
+FROM python:3.9-slim
+
+WORKDIR /app
+
+# Copy requirements first to leverage Docker cache
+COPY watcher_requirements.txt .
+RUN pip install --no-cache-dir -r watcher_requirements.txt
+
+# Copy the watcher script
+COPY csv_watcher.py .
+
+# Create directory for watching CSV files
+RUN mkdir -p /watch
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "csv_watcher.py"]
+CMD ["--path", "/watch", "--url", "https://aces-ml.172.189.152.57.nip.io/metrics"]

@@ -52,14 +52,11 @@ docs/
 *.md
 !README.md
 *.rst
-*.txt
-!requirements.txt
 LICENSE
 
 # Docker files
 .dockerignore
-Dockerfile.*
-docker-compose*.yml
+!Dockerfile.watcher
 
 # Development and test files
 tests/
@@ -68,13 +65,17 @@ test_*.py
 *.test.py
 .pytest_cache/
 
+# Python files
+*.py
+!csv_watcher.py
+!ML.py
+
 # Temporary files
 tmp/
 temp/
 *.tmp
 *.temp
 *.log
-Dockerfile
 final_dataset.csv.bak
 README.md
 LICENSE

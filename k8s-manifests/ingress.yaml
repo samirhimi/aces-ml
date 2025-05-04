@@ -10,6 +10,12 @@ metadata:
     kubernetes.azure.com/enable-caching: "true"
     kubernetes.azure.com/caching: "true"
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    webapprouting.kubernetes.azure.com/client-max-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
   labels:
     app: aces-ml
 spec:
