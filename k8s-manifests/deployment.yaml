@@ -36,7 +36,7 @@ spec:
               mountPath: /app/models
       containers:
         - name: aces-ml
-          image: sami4rhimi/aces-ml:1.0.18  # Updated version
+          image: sami4rhimi/aces-ml:1.0.20  # Updated version
           imagePullPolicy: Always
           ports:
             - name: http
