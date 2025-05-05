@@ -2,11 +2,17 @@
 
 import time
 import os
+import pandas as pd
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import requests
 from datetime import datetime
 import argparse
+import urllib3
+import warnings
+
+# Suppress only the specific InsecureRequestWarning
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 class CSVUploadHandler(FileSystemEventHandler):
     def __init__(self, api_url):
@@ -15,6 +21,7 @@ class CSVUploadHandler(FileSystemEventHandler):
         if not self.api_token:
             raise ValueError("API_TOKEN environment variable is not set")
         self.processed_files = set()
+        self.chunk_size = 1000  # Process 1000 rows at a time
 
     def upload_file(self, file_path):
         if not file_path.endswith('.csv'):
@@ -30,27 +37,56 @@ class CSVUploadHandler(FileSystemEventHandler):
             # Wait a brief moment to ensure the file is fully written
             time.sleep(1)
             
-            with open(file_path, 'rb') as f:
-                headers = {
-                    'Authorization': f'Bearer {self.api_token}'
-                }
-                files = {
-                    'file': (os.path.basename(file_path), f, 'text/csv')
-                }
+            headers = {
+                'Authorization': f'Bearer {self.api_token}'
+            }
+            
+            print(f"📤 Processing {file_path} in chunks")
+            
+            # Read and process the CSV file in chunks
+            chunk_number = 0
+            for chunk in pd.read_csv(file_path, chunksize=self.chunk_size):
+                chunk_number += 1
+                chunk_file = f"{file_path}.chunk{chunk_number}"
                 
-                print(f"📤 Uploading {file_path} to {self.api_url}")
-                response = requests.post(
-                    self.api_url,
-                    headers=headers,
-                    files=files,
-                    verify=False  # Since we're using self-signed certs
-                )
-                
-                if response.status_code == 200:
-                    print(f"✅ Upload successful: {response.json()}")
-                    self.processed_files.add(file_path)
-                else:
-                    print(f"❌ Upload failed: {response.status_code} - {response.text}")
+                try:
+                    # Save the chunk to a temporary file
+                    chunk.to_csv(chunk_file, index=False)
+                    print(f"📤 Uploading chunk {chunk_number}")
+                    
+                    with open(chunk_file, 'rb') as f:
+                        # Create a session with custom SSL verification settings
+                        with requests.Session() as session:
+                            # Configure session with proper SSL settings
+                            session.verify = False  # Required for self-signed certs
+                            adapter = requests.adapters.HTTPAdapter(
+                                pool_connections=1,
+                                pool_maxsize=1,
+                                max_retries=3,
+                                pool_block=True
+                            )
+                            session.mount('https://', adapter)
+                            
+                            response = session.post(
+                                self.api_url,
+                                headers=headers,
+                                files={'file': (os.path.basename(file_path), f, 'text/csv')},
+                                timeout=600  # 10 minutes timeout per chunk
+                            )
+                        
+                    if response.status_code == 200:
+                        print(f"✅ Chunk {chunk_number} uploaded successfully: {response.json()}")
+                    else:
+                        print(f"❌ Chunk {chunk_number} upload failed: {response.status_code} - {response.text}")
+                        return
+                        
+                finally:
+                    # Clean up the temporary chunk file
+                    if os.path.exists(chunk_file):
+                        os.remove(chunk_file)
+            
+            print(f"✅ Complete file {file_path} processed and uploaded successfully")
+            self.processed_files.add(file_path)
                     
         except Exception as e:
             print(f"❌ Error processing file {file_path}: {str(e)}")

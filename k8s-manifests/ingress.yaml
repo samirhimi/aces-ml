@@ -12,6 +12,12 @@ metadata:
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     webapprouting.kubernetes.azure.com/client-max-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-keep-alive: "true"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout http_502 http_503 http_504"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "600"

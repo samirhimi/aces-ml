@@ -120,11 +120,10 @@ class ModelTrainer:
                 return False
             df = pd.read_csv(self.dataset_path)
             
-            # Always train if we have at least min_samples_for_training records
-            if len(df) >= self.min_samples_for_training:
-                # If this is the first training or we have new data
-                if not self.last_training_time or os.path.getmtime(self.dataset_path) > self.last_training_time:
-                    return True
+            # Force training after new file upload
+            if not self.last_training_time or os.path.getmtime(self.dataset_path) > self.last_training_time:
+                return True
+                
             return False
         except Exception as e:
             print(f"Error checking dataset: {str(e)}")
@@ -414,6 +413,11 @@ def receive_metrics():
                 for _, row in df.iterrows():
                     metrics_queue.put(row.to_dict())
                     records_processed += 1
+                
+                # Force model retraining after file upload
+                if trainer.should_train():
+                    print("🔄 New data detected, triggering model retraining...")
+                    threading.Thread(target=process_dataset, args=(trainer.dataset_path, trainer), daemon=True).start()
                 
                 return jsonify({
                     "status": "success",
