@@ -6,7 +6,7 @@ replicaCount: 1
 
 image:
   repository: sami4rhimi/aces-ml
-  tag: "1.0.15"
+  tag: "1.0.20"
   pullPolicy: Always
 
 service:
@@ -15,6 +15,14 @@ service:
   targetPort: 8080
   protocol: TCP
 
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  targetRequestsPerSecond: 100
 
 ingress:
   enabled: true
@@ -39,14 +47,13 @@ ingress:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
 
-
 resources:
   limits:
-    cpu: 1000m
-    memory: 2Gi
+    cpu: 1500m
+    memory: 3Gi
   requests:
-    cpu: 500m
-    memory: 1Gi
+    cpu: 750m
+    memory: 1.5Gi
 
 persistence:
   model:
@@ -60,6 +67,44 @@ persistence:
 
 temporaryStorage:
   sizeLimit: 512Mi
+
+env:
+  - name: ML_MODEL_PATH
+    value: "/app/models/random_forest_model.joblib"
+  - name: DATASET_PATH
+    value: "/app/data/final_dataset.csv"
+  - name: MIN_SAMPLES_FOR_TRAINING
+    value: "1"
+  - name: BATCH_SIZE
+    value: "5"
+  - name: BATCH_TIMEOUT
+    value: "1.0"
+  - name: API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: aces-ml-secret
+        key: api-token
+  - name: LOG_LEVEL
+    value: "INFO"
+  - name: FLASK_ENV
+    value: "production"
+  - name: FLASK_APP
+    value: "ML.py"
+  - name: PYTHONUNBUFFERED
+    value: "1"
+
+initContainers:
+  - name: init-dirs
+    image: busybox
+    command: ['sh', '-c', 'mkdir -p /app/data /app/models && chmod -R 777 /app/data /app/models']
+    volumeMounts:
+      - name: dataset-volume
+        mountPath: /app/data
+      - name: model-volume
+        mountPath: /app/models
+
+podAnnotations:
+  checksum/config: "${RANDOM}"
 
 
 
