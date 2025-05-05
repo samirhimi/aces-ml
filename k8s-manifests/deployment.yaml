@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/instance: aces-ml
     app.kubernetes.io/name: aces-ml
   annotations:
-    kubernetes.io/change-cause: "Updated to enable automatic model retraining on CSV upload"
+    kubernetes.io/change-cause: "Updated to handle CSV column count inconsistencies"
 spec:
   replicas: 1
   selector:
@@ -36,7 +36,7 @@ spec:
               mountPath: /app/models
       containers:
         - name: aces-ml
-          image: sami4rhimi/aces-ml:1.0.16  # Updated version
+          image: sami4rhimi/aces-ml:1.0.18  # Updated version
           imagePullPolicy: Always
           ports:
             - name: http

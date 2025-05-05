@@ -144,7 +144,7 @@ class ModelTrainer:
                 return False
                 
             # Use more robust CSV reading with error handling
-            df = pd.read_csv(self.dataset_path, on_bad_lines='warn', warn_bad_lines=True)
+            df = pd.read_csv(self.dataset_path, on_bad_lines='skip')
             
             # Force training after new file upload
             if not self.last_training_time or os.path.getmtime(self.dataset_path) > self.last_training_time:
@@ -288,20 +288,20 @@ def process_dataset(dataset_path, trainer):
             for i in range(current_cols, expected_cols):
                 df[f'col_{i}'] = 0
                 
-        # Ensure all rows have correct number of columns
-        df = df.reindex(columns=df.columns[:expected_cols])
-        
-        # Drop rows with wrong column count
+        # Only drop completely empty rows or rows with NaN in critical columns
         initial_rows = len(df)
-        df = df.dropna(axis=0, thresh=expected_cols)  # Drop rows with too many NaN values
+        df = df.dropna(subset=['Abnormality class'])  # Only drop rows with NaN in critical column
         rows_dropped = initial_rows - len(df)
         if rows_dropped > 0:
-            print(f"⚠️ Dropped {rows_dropped} rows with incorrect column count")
+            print(f"⚠️ Dropped {rows_dropped} rows with missing critical data")
             
-        df = df.dropna(subset=['Abnormality class'])
         print("📌 Final data shape:", df.shape)
         print("📌 Class distribution:")
         print(df['Abnormality class'].value_counts())
+        
+        if len(df) == 0:
+            print("❌ Error: No valid data rows remaining after preprocessing")
+            return
         
         # FIXED: Safer column dropping approach
         # Only drop columns that actually exist in the dataframe
@@ -327,6 +327,10 @@ def process_dataset(dataset_path, trainer):
         X = X.fillna(0)
         print("📌 Features shape after preprocessing:", X.shape)
         
+        if len(X) < 2:  # Need at least 2 samples for train/test split
+            print("❌ Error: Not enough samples for training after preprocessing")
+            return
+            
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         print(f"✔️ Training set size: {X_train.shape}")
         print(f"✔️ Test set size: {X_test.shape}")
@@ -462,7 +466,6 @@ def receive_metrics():
                 df = pd.read_csv(
                     stream,
                     on_bad_lines='skip',  # Skip lines with incorrect number of fields
-                    warn_bad_lines=True,   # Show warning for skipped lines
                     low_memory=False
                 )
                 
