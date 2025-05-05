@@ -15,6 +15,21 @@ service:
   targetPort: 8080
   protocol: TCP
 
+# Monitoring configuration
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  labels:
+    release: prometheus
+
+prometheusRule:
+  enabled: true
+  rules:
+    - name: http-requests-per-second
+      rules:
+        - record: http_requests_per_second
+          expr: rate(http_requests_total{endpoint!="/metrics",endpoint!="/health"}[1m])
+
 # Autoscaling configuration
 autoscaling:
   enabled: true

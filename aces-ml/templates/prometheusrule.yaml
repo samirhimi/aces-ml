@@ -1,0 +1,15 @@
+{{- if .Values.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "aces-ml.fullname" . }}
+  labels:
+    {{- include "aces-ml.labels" . | nindent 4 }}
+spec:
+  groups:
+  {{- range .Values.prometheusRule.rules }}
+    - name: {{ .name }}
+      rules:
+      {{- toYaml .rules | nindent 8 }}
+  {{- end }}
+{{- end }}
