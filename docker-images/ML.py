@@ -63,6 +63,7 @@ class ModelTrainer:
         self.backup_dir = 'csv_backups'
         self.min_samples_for_training = int(os.getenv('MIN_SAMPLES_FOR_TRAINING', '1'))
         self.last_training_time = None
+        self.ML_MODEL_PATH = os.path.join("/app/models/", "random_forest_model.joblib")
         os.makedirs(self.backup_dir, exist_ok=True)
         self.load_model()
         # Start CSV cleanup thread
@@ -107,18 +108,43 @@ class ModelTrainer:
     def append_metrics(self, metrics_data):
         """Append new metrics to the dataset file"""
         with self.dataset_lock:
-            # Backup current dataset before appending new data
-            self.backup_current_dataset()
-            df = pd.DataFrame([metrics_data])
-            df.to_csv(self.dataset_path, mode='a', header=False, index=False)
-            print(f"✔️ Appended new metrics to {self.dataset_path}")
+            try:
+                # Read existing CSV header to get expected columns
+                if os.path.exists(self.dataset_path):
+                    header = pd.read_csv(self.dataset_path, nrows=0)
+                    expected_cols = header.columns.tolist()
+                    
+                    # Ensure metrics_data has exactly the expected columns
+                    metrics_df = pd.DataFrame([metrics_data])
+                    
+                    # Add missing columns with default value 0
+                    for col in expected_cols:
+                        if col not in metrics_df.columns:
+                            metrics_df[col] = 0
+                    
+                    # Only keep expected columns in the correct order
+                    metrics_df = metrics_df[expected_cols]
+                    
+                    # Backup and append
+                    self.backup_current_dataset()
+                    metrics_df.to_csv(self.dataset_path, mode='a', header=False, index=False)
+                    print(f"✔️ Appended new metrics to {self.dataset_path}")
+                else:
+                    # If file doesn't exist, create it with these metrics
+                    df = pd.DataFrame([metrics_data])
+                    df.to_csv(self.dataset_path, index=False)
+                    print(f"✔️ Created new dataset at {self.dataset_path}")
+            except Exception as e:
+                print(f"❌ Error appending metrics: {str(e)}")
 
     def should_train(self):
         """Check if we should retrain the model"""
         try:
             if not os.path.exists(self.dataset_path):
                 return False
-            df = pd.read_csv(self.dataset_path)
+                
+            # Use more robust CSV reading with error handling
+            df = pd.read_csv(self.dataset_path, on_bad_lines='warn', warn_bad_lines=True)
             
             # Force training after new file upload
             if not self.last_training_time or os.path.getmtime(self.dataset_path) > self.last_training_time:
@@ -127,6 +153,7 @@ class ModelTrainer:
             return False
         except Exception as e:
             print(f"Error checking dataset: {str(e)}")
+            # Don't trigger training if there are data issues
             return False
 
     def train(self, X_train, X_test, y_train, y_test):
@@ -231,7 +258,14 @@ def process_dataset(dataset_path, trainer):
         model_dir = os.path.dirname(trainer.ML_MODEL_PATH)
         os.makedirs(model_dir, exist_ok=True)
         
-        df = pd.read_csv(dataset_path, low_memory=False)
+        # Read CSV with more robust error handling
+        try:
+            df = pd.read_csv(dataset_path, low_memory=False, on_bad_lines='skip')
+            print(f"📊 Initial data shape: {df.shape}")
+        except Exception as e:
+            print(f"❌ Error reading CSV, attempting with Python engine: {str(e)}")
+            df = pd.read_csv(dataset_path, low_memory=False, engine='python')
+            print(f"📊 Data shape after using Python engine: {df.shape}")
         
         # Check if 'Abnormality class' column exists
         if 'Abnormality class' not in df.columns:
@@ -239,18 +273,33 @@ def process_dataset(dataset_path, trainer):
             print(f"Available columns: {df.columns.tolist()}")
             return
             
-        # Ensure consistent number of columns
+        # Handle column count consistency
         expected_cols = 265
-        if len(df.columns) > expected_cols:
-            print(f"⚠️ Found {len(df.columns)} columns, truncating to {expected_cols}")
+        current_cols = len(df.columns)
+        print(f"📊 Current column count: {current_cols}, Expected: {expected_cols}")
+        
+        if current_cols > expected_cols:
+            print(f"⚠️ Found {current_cols} columns, truncating to {expected_cols}")
+            # Keep first expected_cols columns
             df = df.iloc[:, :expected_cols]
-        elif len(df.columns) < expected_cols:
-            print(f"⚠️ Found {len(df.columns)} columns, padding to {expected_cols}")
-            for i in range(len(df.columns), expected_cols):
+        elif current_cols < expected_cols:
+            print(f"⚠️ Found {current_cols} columns, padding to {expected_cols}")
+            # Add missing columns with default value 0
+            for i in range(current_cols, expected_cols):
                 df[f'col_{i}'] = 0
+                
+        # Ensure all rows have correct number of columns
+        df = df.reindex(columns=df.columns[:expected_cols])
+        
+        # Drop rows with wrong column count
+        initial_rows = len(df)
+        df = df.dropna(axis=0, thresh=expected_cols)  # Drop rows with too many NaN values
+        rows_dropped = initial_rows - len(df)
+        if rows_dropped > 0:
+            print(f"⚠️ Dropped {rows_dropped} rows with incorrect column count")
             
         df = df.dropna(subset=['Abnormality class'])
-        print("📌 Data shape:", df.shape)
+        print("📌 Final data shape:", df.shape)
         print("📌 Class distribution:")
         print(df['Abnormality class'].value_counts())
         
@@ -277,6 +326,7 @@ def process_dataset(dataset_path, trainer):
         X = X.apply(pd.to_numeric, errors='coerce')
         X = X.fillna(0)
         print("📌 Features shape after preprocessing:", X.shape)
+        
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         print(f"✔️ Training set size: {X_train.shape}")
         print(f"✔️ Test set size: {X_test.shape}")
@@ -398,9 +448,23 @@ def receive_metrics():
                 
             # Read CSV file
             try:
-                # Read CSV file into memory
+                # Read CSV file into memory using more robust parameters
                 stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
-                df = pd.read_csv(stream)
+                
+                # First read header to get expected columns
+                header_df = pd.read_csv(stream, nrows=0)
+                expected_cols = len(header_df.columns)
+                
+                # Reset stream position
+                stream.seek(0)
+                
+                # Read full CSV with error handling for inconsistent columns
+                df = pd.read_csv(
+                    stream,
+                    on_bad_lines='skip',  # Skip lines with incorrect number of fields
+                    warn_bad_lines=True,   # Show warning for skipped lines
+                    low_memory=False
+                )
                 
                 # Validate required columns
                 required_fields = ['timestamp', 'Abnormality class']
@@ -408,11 +472,32 @@ def receive_metrics():
                 if missing_fields:
                     return jsonify({"error": f"Missing required columns in CSV: {', '.join(missing_fields)}"}), 400
                 
+                # Handle column count consistency
+                current_cols = len(df.columns)
+                if current_cols > expected_cols:
+                    print(f"⚠️ Found {current_cols} columns, truncating to {expected_cols}")
+                    df = df.iloc[:, :expected_cols]
+                elif current_cols < expected_cols:
+                    print(f"⚠️ Found {current_cols} columns, padding to {expected_cols}")
+                    for i in range(current_cols, expected_cols):
+                        df[f'col_{i}'] = 0
+                
                 # Process each row
                 records_processed = 0
+                skipped_rows = 0
+                
                 for _, row in df.iterrows():
-                    metrics_queue.put(row.to_dict())
-                    records_processed += 1
+                    try:
+                        metrics_queue.put(row.to_dict())
+                        records_processed += 1
+                    except Exception as row_error:
+                        print(f"⚠️ Error processing row: {str(row_error)}")
+                        skipped_rows += 1
+                        continue
+                
+                status_message = f"CSV file processed successfully. Processed: {records_processed}"
+                if skipped_rows > 0:
+                    status_message += f", Skipped: {skipped_rows}"
                 
                 # Force model retraining after file upload
                 if trainer.should_train():
@@ -421,8 +506,9 @@ def receive_metrics():
                 
                 return jsonify({
                     "status": "success",
-                    "message": "CSV file processed successfully",
-                    "records_processed": records_processed
+                    "message": status_message,
+                    "records_processed": records_processed,
+                    "records_skipped": skipped_rows
                 }), 200
                 
             except pd.errors.EmptyDataError:
