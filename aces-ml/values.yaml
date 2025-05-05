@@ -9,6 +9,80 @@ image:
   tag: "1.0.20"
   pullPolicy: Always
 
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+labels:
+  app: aces-ml
+  app.kubernetes.io/instance: aces-ml
+  app.kubernetes.io/name: aces-ml
+
+resources:
+  limits:
+    cpu: 1500m
+    memory: 3Gi
+  requests:
+    cpu: 750m
+    memory: 1.5Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+volumes:
+  dataset:
+    name: dataset-volume
+    size: 1Gi
+  model:
+    name: model-volume
+    size: 2Gi
+  backup:
+    name: backup-volume
+  tmp:
+    name: tmp-volume
+    sizeLimit: 512Mi
+
+probes:
+  readiness:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  liveness:
+    path: /health
+    initialDelaySeconds: 60
+    periodSeconds: 30
+
+env:
+  - name: ML_MODEL_PATH
+    value: "/app/models/random_forest_model.joblib"
+  - name: DATASET_PATH
+    value: "/app/data/final_dataset.csv"
+  - name: MIN_SAMPLES_FOR_TRAINING
+    value: "1"
+  - name: BATCH_SIZE
+    value: "5"
+  - name: BATCH_TIMEOUT
+    value: "1.0"
+  - name: API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: aces-ml-secret
+        key: api-token
+  - name: LOG_LEVEL
+    value: "INFO"
+  - name: FLASK_ENV
+    value: "production"
+  - name: FLASK_APP
+    value: "ML.py"
+  - name: PYTHONUNBUFFERED
+    value: "1"
+
 service:
   type: ClusterIP
   port: 80
@@ -69,15 +143,6 @@ prometheusRule:
         - record: batch_processing_rate
           expr: rate(batch_processed_total[5m])
 
-# Autoscaling configuration
-autoscaling:
-  enabled: true
-  minReplicas: 1
-  maxReplicas: 5
-  targetCPUUtilizationPercentage: 80
-  targetMemoryUtilizationPercentage: 80
-  targetRequestsPerSecond: 100
-
 ingress:
   enabled: true
   path: /
@@ -100,14 +165,18 @@ ingress:
     nginx.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
-
-resources:
-  limits:
-    cpu: 1500m
-    memory: 3Gi
-  requests:
-    cpu: 750m
-    memory: 1.5Gi
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    webapprouting.kubernetes.azure.com/client-max-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-keep-alive: "true"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout http_502 http_503 http_504"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
 
 persistence:
   model:
@@ -122,31 +191,6 @@ persistence:
 temporaryStorage:
   sizeLimit: 512Mi
 
-env:
-  - name: ML_MODEL_PATH
-    value: "/app/models/random_forest_model.joblib"
-  - name: DATASET_PATH
-    value: "/app/data/final_dataset.csv"
-  - name: MIN_SAMPLES_FOR_TRAINING
-    value: "1"
-  - name: BATCH_SIZE
-    value: "5"
-  - name: BATCH_TIMEOUT
-    value: "1.0"
-  - name: API_TOKEN
-    valueFrom:
-      secretKeyRef:
-        name: aces-ml-secret
-        key: api-token
-  - name: LOG_LEVEL
-    value: "INFO"
-  - name: FLASK_ENV
-    value: "production"
-  - name: FLASK_APP
-    value: "ML.py"
-  - name: PYTHONUNBUFFERED
-    value: "1"
-
 initContainers:
   - name: init-dirs
     image: busybox
@@ -156,9 +200,6 @@ initContainers:
         mountPath: /app/data
       - name: model-volume
         mountPath: /app/models
-
-podAnnotations:
-  checksum/config: "${RANDOM}"
 
 
 
