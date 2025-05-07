@@ -8,7 +8,7 @@ To learn more about the release, try:
   $ helm get all {{ .Release.Name }} -n {{ .Release.Namespace }}
 
 The ML service can be accessed within your cluster at:
-  http://{{ include "aces-ml.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+  https://{{ include "aces-ml.fullname" . }}.{{ .Values.ingress.host }}
 
 The following volumes have been configured:
 {{- if .Values.persistence.model.enabled }}
