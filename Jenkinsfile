@@ -72,9 +72,6 @@ pipeline {
                     docker.withRegistry('https://index.docker.io/v1/', 'docker-credentials') {
                         docker.image("${DOCKER_IMAGE}-app:${BUILD_NUMBER}").push()
                         docker.image("${DOCKER_IMAGE}-app:${BUILD_NUMBER}").push('latest')
-                        
-                        docker.image("${DOCKER_IMAGE}-watcher:${BUILD_NUMBER}").push()
-                        docker.image("${DOCKER_IMAGE}-watcher:${BUILD_NUMBER}").push('latest')
                     }
                 }
             }
