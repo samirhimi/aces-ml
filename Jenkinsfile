@@ -69,18 +69,7 @@ pipeline {
             }
         }
 
-        stage('Push Docker Images') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'docker-credentials') {
-                        docker.image("${DOCKER_IMAGE}-app:${BUILD_NUMBER}").push()
-                        docker.image("${DOCKER_IMAGE}-app:${BUILD_NUMBER}").push('latest')
-                    }
-                }
-            }
-        }
-
-        stage('scan Docker Images') {
+                stage('scan Docker Images') {
             steps {
                 script {
                     // Scan the Docker image for vulnerabilities
@@ -96,6 +85,19 @@ pipeline {
                 }
             }
         }
+
+        stage('Push Docker Images') {
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-credentials') {
+                        docker.image("${DOCKER_IMAGE}-app:${BUILD_NUMBER}").push()
+                        docker.image("${DOCKER_IMAGE}-app:${BUILD_NUMBER}").push('latest')
+                    }
+                }
+            }
+        }
+
+
 
         stage('Deploy to Kubernetes') {
             steps {
