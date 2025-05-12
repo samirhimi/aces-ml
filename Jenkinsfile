@@ -1,5 +1,8 @@
 pipeline {
-    agent linux
+
+    agent {
+        label 'docker'
+    }
 
     environment {
         DOCKER_REGISTRY = 'sami4rhimi'  
