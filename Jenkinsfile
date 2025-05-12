@@ -15,7 +15,7 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'dev', url: 'https://github.com/samirhimi/aces-ml.git'
             }
         }
 
