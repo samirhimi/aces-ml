@@ -83,7 +83,7 @@ pipeline {
                     // Update Helm chart values with new image tags
                     sh """
                         helm upgrade --install ${APP_NAME} ./aces-ml \
-                            --namespace aces-ml \
+                            --namespace aces-ml-dev \
                             --create-namespace \
                             --set image.repository=${DOCKER_IMAGE}-app \
                             --set image.tag=${BUILD_NUMBER} \
