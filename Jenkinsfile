@@ -34,7 +34,7 @@ pipeline {
             steps {
                 sh '''
                     . venv/bin/activate
-                    pytest --cov=. --cov-report=xml
+                    pytest --cov=docker-images/. --cov-report=xml
                 '''
             }
         }
