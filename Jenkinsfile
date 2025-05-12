@@ -80,6 +80,23 @@ pipeline {
             }
         }
 
+        stage('scan Docker Images') {
+            steps {
+                script {
+                    // Scan the Docker image for vulnerabilities
+                    sh """
+                        docker run --rm \
+                            -v /var/run/docker.sock:/var/run/docker.sock \
+                            aquasec/trivy:latest image \
+                            --exit-code 1 \
+                            --severity HIGH,CRITICAL \
+                            --no-progress \
+                            ${DOCKER_IMAGE}-app:${BUILD_NUMBER}
+                    """
+                }
+            }
+        }
+
         stage('Deploy to Kubernetes') {
             steps {
                 script {
