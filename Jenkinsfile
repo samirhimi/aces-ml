@@ -35,7 +35,7 @@ pipeline {
                 sh '''
                     . venv/bin/activate
                     # Run unit tests and generate coverage report
-                    pytest tests -v --cov-report term --cov-report html:htmlcov --cov-report xml --cov-fail-under=80 --cov=docker-images/
+                    pytest -v --cov-report term --cov-report html:htmlcov --cov-report xml --cov-fail-under=80 --cov=docker-images/
 
                 '''
             }
