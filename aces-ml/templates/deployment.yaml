@@ -7,6 +7,8 @@ metadata:
     {{- with .Values.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  annotations:
+    kubernetes.io/change-cause: "Updated to match latest manifest configuration"
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
@@ -19,12 +21,15 @@ spec:
         {{- with .Values.labels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-      {{- with .Values.podAnnotations }}
       annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.initContainers }}
+      initContainers:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-    spec:
-      
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -37,8 +42,23 @@ spec:
           {{- end }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
-              protocol: TCP
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: {{ .Values.service.protocol }}
+          env:
+            - name: ML_MODEL_PATH
+              value: "/app/models/model_files/random_forest_model.joblib"
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: FLASK_ENV
+              value: "production"
+            - name: FLASK_APP
+              value: "ML.py"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          {{- with .Values.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -46,12 +66,22 @@ spec:
               mountPath: /app/models
             - name: dataset-volume
               mountPath: /app/data
+            - name: backup-volume
+              mountPath: /app/csv_backups
             - name: tmp-volume
               mountPath: /tmp
-          {{- if .Values.env }}
-          env:
-            {{- toYaml .Values.env | nindent 12 }}
-          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
       volumes:
         - name: model-volume
           {{- if .Values.persistence.model.enabled }}
@@ -67,6 +97,8 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: backup-volume
+          emptyDir: {}
         - name: tmp-volume
           emptyDir:
             medium: Memory

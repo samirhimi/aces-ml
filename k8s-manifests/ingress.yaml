@@ -1,0 +1,43 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aces-ml
+  namespace: aces-ml
+  annotations:
+    kubernetes.azure.com/static-ip: "true"
+    kubernetes.azure.com/ssl-redirect: "true"
+    kubernetes.azure.com/ssl-force-redirect: "true" 
+    kubernetes.azure.com/enable-caching: "true"
+    kubernetes.azure.com/caching: "true"
+    kubernetes.io/ingress.class: webapprouting.kubernetes.azure.com
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    webapprouting.kubernetes.azure.com/client-max-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-set-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-headers: "true"
+    nginx.ingress.kubernetes.io/proxy-keep-alive: "true"
+    nginx.ingress.kubernetes.io/proxy-next-upstream: "error timeout http_502 http_503 http_504"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-tries: "3"
+    nginx.ingress.kubernetes.io/proxy-next-upstream-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+  labels:
+    app: aces-ml
+spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
+  tls:
+  - hosts:
+    - aces-ml.172.189.152.57.nip.io
+    secretName: aces-tls-secret
+  rules:
+  - host: aces-ml.172.189.152.57.nip.io
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: aces-ml
+            port: 
+              number: 80

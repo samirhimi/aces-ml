@@ -1,0 +1,19 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "aces-ml.fullname" . }}
+  labels:
+    {{- include "aces-ml.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+    - port: http
+      path: /prometheus_metrics
+      interval: {{ .Values.serviceMonitor.interval }}
+  selector:
+    matchLabels:
+      {{- include "aces-ml.selectorLabels" . | nindent 6 }}
+{{- end }}

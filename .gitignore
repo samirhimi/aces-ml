@@ -46,3 +46,7 @@ Thumbs.db
 .env.*
 !.env.example
 models/*.joblib
+*.sh
+provision/
+*.csv
+*.bak
