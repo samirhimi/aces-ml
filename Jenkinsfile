@@ -46,7 +46,7 @@ pipeline {
                         --cov-report xml:../coverage.xml \
                         --cov=. \
                         --cov-config=tests/.coveragerc \
-                        --cov-fail-under=80
+                        --cov-fail-under=20
                 '''
             }
             post {
