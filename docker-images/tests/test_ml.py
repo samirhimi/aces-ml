@@ -15,7 +15,7 @@ def model_trainer():
             'feature2': np.random.rand(10),
             'target': np.random.choice([0, 1], 10)
         })
-        dataset_path = os.path.join(tmpdir, 'test_dataset.csv')
+        dataset_path = os.path.join(tmpdir, 'final_dataset.csv')
         df.to_csv(dataset_path, index=False)
         
         # Set environment variables for testing
