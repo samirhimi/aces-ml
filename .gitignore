@@ -49,3 +49,4 @@ models/*.joblib
 *.sh
 provision/
 *.csv
+*.bak
