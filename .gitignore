@@ -48,3 +48,4 @@ Thumbs.db
 models/*.joblib
 *.sh
 provision/
+*.csv
