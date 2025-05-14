@@ -37,14 +37,30 @@ pipeline {
                     . venv/bin/activate
                     # Move to the docker-images directory where the code is
                     cd docker-images
+                    # Create models directory for tests
+                    mkdir -p models
                     # Run unit tests and generate coverage report
-                    python -m pytest ../docker-images/tests -v \
+                    python -m pytest tests -v \
                         --cov-report term \
                         --cov-report html:../htmlcov \
                         --cov-report xml:../coverage.xml \
                         --cov=. \
+                        --cov-config=tests/.coveragerc \
                         --cov-fail-under=80
                 '''
+            }
+            post {
+                always {
+                    junit '**/test-results.xml'
+                    publishHTML (target: [
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: false,
+                        keepAll: true,
+                        reportDir: 'htmlcov',
+                        reportFiles: 'index.html',
+                        reportName: "Coverage Report"
+                    ])
+                }
             }
         }
 
