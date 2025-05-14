@@ -18,12 +18,11 @@ import psutil
 import queue
 from werkzeug.utils import secure_filename
 import io
-from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
+
 
 app = Flask(__name__)
 
-# Create Prometheus metrics
-REQUEST_COUNT = Counter('http_requests_total', 'Total number of HTTP requests', ['method', 'endpoint', 'status'])
+
 
 # Middleware to count requests
 @app.before_request
@@ -40,10 +39,7 @@ def after_request(response):
     ).inc()
     return response
 
-# Prometheus metrics endpoint
-@app.route('/prometheus_metrics')
-def metrics():
-    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
+
 
 # Create a queue for new metrics
 metrics_queue = queue.Queue()
