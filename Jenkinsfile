@@ -31,15 +31,15 @@ pipeline {
             }
         }
 
-        // stage('Run Tests') {
-        //     steps {
-        //         sh '''
-        //             . venv/bin/activate
-        //             # Run unit tests and generate coverage report
-        //             pytest -v --cov-report term --cov-report html:htmlcov --cov-report xml --cov-fail-under=80 --cov=docker-images/
-        //         '''
-        //     }
-        // }
+        stage('Run Tests') {
+            steps {
+                sh '''
+                    . venv/bin/activate
+                    # Run unit tests and generate coverage report
+                    pytest -v --cov-report term --cov-report html:htmlcov --cov-report xml --cov-fail-under=80 --cov=docker-images/
+                '''
+            }
+        }
 
         stage('SonarQube Analysis') {
             steps {
@@ -55,8 +55,8 @@ pipeline {
                                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                                 -Dsonar.host.url=http://51.103.99.98:9000 \
                                 -Dsonar.python.version=3.8,3.9,3.10 \
-/*                                 // -Dsonar.tests=docker-images/tests \
-                                // -Dsonar.test.inclusions=**/*_test.py,**/test_*.py \ */
+                                -Dsonar.tests=docker-images/tests \
+                                -Dsonar.test.inclusions=**/*_test.py,**/test_*.py \
                                 -Dsonar.token=${SONAR_TOKEN}
                         """
                     }
