@@ -55,8 +55,8 @@ pipeline {
                                 -Dsonar.python.coverage.reportPaths=coverage.xml \
                                 -Dsonar.host.url=http://51.103.99.98:9000 \
                                 -Dsonar.python.version=3.8,3.9,3.10 \
-                                -Dsonar.tests=docker-images/tests \
-                                -Dsonar.test.inclusions=**/*_test.py,**/test_*.py \
+                                // -Dsonar.tests=docker-images/tests \
+                                // -Dsonar.test.inclusions=**/*_test.py,**/test_*.py \
                                 -Dsonar.token=${SONAR_TOKEN}
                         """
                     }
