@@ -35,8 +35,15 @@ pipeline {
             steps {
                 sh '''
                     . venv/bin/activate
+                    # Move to the docker-images directory where the code is
+                    cd docker-images
                     # Run unit tests and generate coverage report
-                    pytest -v --cov-report term --cov-report html:htmlcov --cov-report xml --cov-fail-under=80 --cov=docker-images/
+                    python -m pytest ../docker-images/tests -v \
+                        --cov-report term \
+                        --cov-report html:../htmlcov \
+                        --cov-report xml:../coverage.xml \
+                        --cov=. \
+                        --cov-fail-under=80
                 '''
             }
         }
